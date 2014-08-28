@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>JS13K</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <canvas id="C"></canvas>
+  <script id="vertexLogic" type="x-shader/x-vertex">
+    attribute vec2 position;
+    void main() {
+      gl_Position = vec4(2.0*position-1.0, 0.0, 1.0);
+    }
+  </script>
+  <script id="fragmentLogic" type="x-shader/x-fragment">
+    precision highp float;
+    uniform vec2 size;
+    uniform float time;
+    uniform sampler2D state;
+
+    vec4 getColor(vec2 position) {
+      return texture2D(state, (gl_FragCoord.xy + position) / size);
+    }
+    int get (vec2 position) {
+      return getColor(position).r == 0.0 ? 0 : 1;
+    }
+    
+    void main () {
+      int sum = get(vec2(-1.0, -1.0)) + get(vec2(0.0, -1.0)) + get(vec2(1.0, -1.0)) +
+        get(vec2(-1.0, 0.0)) + get(vec2(1.0, 0.0)) +
+        get(vec2(-1.0, 1.0)) + get(vec2(0.0, 1.0)) + get(vec2(1.0, 1.0));
+      int last = get(vec2(0.0, 0.0));
+      int current = 0;
+      if ((last == 0 && sum == 3) || (last == 1 && (sum == 2 || sum == 3))) {
+        current = 1;
+      }
+      gl_FragColor = vec4(vec3(float(current)), 1.0);
+    }
+  </script>
+  
+  <script id="vertexRender" type="x-shader/x-vertex">
+    attribute vec2 position; void main() { gl_Position = vec4(2.0*position-1.0, 0.0, 1.0);}
+  </script>
+  <script id="fragmentRender" type="x-shader/x-fragment">
+    precision highp float;
+    uniform vec2 size;
+    uniform vec2 resolution;
+    uniform float time;
+    uniform sampler2D logic;
+    
+    void main () {
+      gl_FragColor = texture2D(logic, gl_FragCoord.xy / resolution);
+    }
+  </script>
+  <script src="index.js"></script>
+</body>
+</html>
