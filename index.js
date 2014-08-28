@@ -79,19 +79,26 @@ gl.attachShader(program, shader);
 gl.linkProgram(program);
 validateProg(program);
 
+var logicTimeL = gl.getUniformLocation(program, "time");
 var logicColorsL = gl.getUniformLocation(program, "colors");
 var logicStateL = gl.getUniformLocation(program, "state");
 var logicSizeL = gl.getUniformLocation(program, "size");
 var logicPositionL = gl.getAttribLocation(program, "position");
 gl.enableVertexAttribArray(logicPositionL);
 
+function affectColor (buf, i, c) {
+  buf[i+0] = 255 * colors[c * 3+0];
+  buf[i+1] = 255 * colors[c * 3+1];
+  buf[i+2] = 255 * colors[c * 3+2];
+  buf[i+3] = 255;
+}
+
 var data = new Uint8Array(4 * size * size);
 for(var i = 0; i < data.length; i += 4) {
   var r = Math.floor(Math.random() * colors.length);
-  data[i+0] = 255 * colors[r * 3+0];
-  data[i+1] = 255 * colors[r * 3+1];
-  data[i+2] = 255 * colors[r * 3+2];
-  data[i+3] = 255;
+  //affectColor(data, i, r);
+  if (i/4 == size * size / 2 - size * 0.5) affectColor(data, i, 1);
+  if (Math.random() < 0.0001) affectColor(data, i, 1);
 }
 
 var logicTexture = gl.createTexture();
@@ -115,7 +122,9 @@ var logicProgram = program;
 
 var start = Date.now();
 (function loop () {
+  var time = (Date.now()-start)/1000;
   gl.useProgram(logicProgram);
+  gl.uniform1f(logicTimeL, time);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(logicPositionL, 2, gl.FLOAT, gl.FALSE, 0, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, logicFramebuffer);
@@ -125,7 +134,6 @@ var start = Date.now();
 
   gl.useProgram(renderProgram);
   gl.uniform1i(renderLogicL, 0);
-  var time = (Date.now()-start)/1000;
   gl.uniform1f(renderTimeL, time);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
