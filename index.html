@@ -61,13 +61,8 @@
       //////// FIRE RULES ///////
       e = 2;
 
-      float frr = 0.04; // fire randomness
-      float frh = 0.03; // fire hole
-
-      if (dow == 1)
-        r = e;
-      else if (dow == e)
-        r = e;
+      float frr = 0.1; // fire randomness
+      float frh = 0.01; // fire hole
 
       if (dol == e && o < frr)
         r = e;
@@ -75,8 +70,12 @@
       if (dor == e && 1.0-o < frr)
         r = e;
 
-      if (dol == e && dor == e && dow == e && oo < frh)
-        r = me;
+      if (dol==e && dor==e || dow == e && oo > frh)
+        r = e;
+
+      if (dow == 1)
+        r = e;
+
 
       ////// WATER RULES ///////
       e = 3;
