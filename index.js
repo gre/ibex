@@ -2,6 +2,14 @@ var size = 128;
 C.width = C.height = size * 4;
 var gl = C.getContext("webgl") || C.getContext("experimental-webgl");
 
+var colors = [
+  0, 0, 0, // 0: air
+  190/255, 170/255, 130/255, // 1: ground
+  215/255, 45/255, 20/255, // 2: fire
+  69/255, 160/255, 180/255, // 3: water
+  170/255, 180/255, 180/255 // 4: air
+];
+
 var shader, shaderSrc, shaderType, program;
 
 /// Rendering program
@@ -71,6 +79,7 @@ gl.attachShader(program, shader);
 gl.linkProgram(program);
 validateProg(program);
 
+var logicColorsL = gl.getUniformLocation(program, "colors");
 var logicStateL = gl.getUniformLocation(program, "state");
 var logicSizeL = gl.getUniformLocation(program, "size");
 var logicPositionL = gl.getAttribLocation(program, "position");
@@ -78,12 +87,11 @@ gl.enableVertexAttribArray(logicPositionL);
 
 var data = new Uint8Array(4 * size * size);
 for(var i = 0; i < data.length; i += 4) {
-  if(Math.random() < 0.5) {
-    data[i] = 0;
-  }
-  else {
-    data[i] = 255;
-  }
+  var r = Math.floor(Math.random() * colors.length);
+  data[i+0] = 255 * colors[r * 3+0];
+  data[i+1] = 255 * colors[r * 3+1];
+  data[i+2] = 255 * colors[r * 3+2];
+  data[i+3] = 255;
 }
 
 var logicTexture = gl.createTexture();
@@ -101,6 +109,7 @@ gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, log
 gl.useProgram(program);
 gl.uniform1i(logicStateL, 0);
 gl.uniform2fv(logicSizeL, [size, size]);
+gl.uniform3fv(logicColorsL, colors);
 
 var logicProgram = program;
 
@@ -121,7 +130,7 @@ var start = Date.now();
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  setTimeout(loop, 20);
+  setTimeout(loop, 50);
 }());
 
 
