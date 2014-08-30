@@ -2,6 +2,8 @@ var size = 128;
 C.width = C.height = size * 4;
 var gl = C.getContext("webgl") || C.getContext("experimental-webgl");
 
+var updateRate = 50;
+
 var colors = [
   0.11, 0.16, 0.23, // 0: air
   0.74, 0.66, 0.51, // 1: earth
@@ -106,8 +108,8 @@ for(var i = 0; i < data.length; i += 4) {
   var r = Math.floor(Math.random() * colors.length);
   //affectColor(data, i, r);
   if (perlin[i/4] > 0.55) affectColor(data, i, 1);
-  if (perlin[i/4] > 0.85) affectColor(data, i, 4);
-  if (perlin2[i/4] > 0.8) affectColor(data, i, 5);
+  if (perlin[i/4] > 0.8) affectColor(data, i, 4);
+  if (perlin2[i/4] < 0.15) affectColor(data, i, 5);
 }
 
 var logicTexture = gl.createTexture();
@@ -139,7 +141,7 @@ var start = Date.now();
   gl.bindFramebuffer(gl.FRAMEBUFFER, logicFramebuffer);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  setTimeout(update, 50);
+  setTimeout(update, updateRate);
 }());
 
 (function render () {

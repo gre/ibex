@@ -37,20 +37,20 @@
       * =======
       * Water + Nothing => fall / slide
       * Fire + Nothing => grow
-      * Air + Nothing => move (directional wind)
-      * Water + Fire => sometimes creates Air (Steam/Wind)
-      * Water + Air => Water is deviated (wind)
-      * Fire + Air => Fire decrease IF not surrounded by air OTHERWISE is increase (need oxygen)
+ TODO     * Air + Nothing => move (directional wind)
+ TODO     * Water + Fire => sometimes creates Air (Steam/Wind)
+ TODO     * Water + Air => Water is deviated (wind)
+ TODO     * Fire + Air => Fire decrease IF not surrounded by air OTHERWISE is increase (need oxygen)
       * Earth + Water => rarely creates Water Source (water infiltration)
       * Earth + Fire => rarely creates Volcano (fire melt ground into lava)
-      * Earth + Air => sometimes Destroy (erosion), rarely creates Volcano (spark)
+ TODO     * Earth + Air => sometimes Destroy (erosion), rarely creates Volcano (spark)
       *
       * Secondary elements: Source, Volcano
       * =========
       * Source + Nothing => creates Water (on bottom).
       * Volcano + Nothing => creates Fire (on top)
-      * Volcano + Source => IF source on top of volcano: sometimes creates Ground. OTHERWISE: sometimes creates volcano.
-      * Volcano + Water => rarely creates Source.
+ TODO     * Volcano + Source => IF source on top of volcano: sometimes creates Ground. OTHERWISE: sometimes creates volcano.
+ TODO     * Volcano + Water => rarely creates Source.
       * Earth + Volcano => rarely Volcano expand / grow up in the Earth.
       * Earth + Source => rarely Source expand / infiltrate in the Earth.
       * Source + Fire => Source die.
@@ -61,6 +61,7 @@
       * Volcano + Air
       * Source + Air
       * Source + Water
+
       */
   
     precision highp float;
@@ -121,6 +122,9 @@
     bool matchAny (mat3 pattern) {
       return match(pattern) > 1;
     }
+    bool matchOne (mat3 pattern) {
+      return matchAny(pattern);
+    }
 
     bool between (float f, float a, float b) {
       return a <= f && f <= b;
@@ -131,8 +135,8 @@
     }
 
     void main () {
-      float o = rand(gl_FragCoord.xy + 0.00001*time * 0.1);
-      float oo = rand(gl_FragCoord.xy + 0.00001*time * 9.1 + 13.91);
+      float o = rand(gl_FragCoord.xy + 0.01*time * 0.1);
+      float oo = rand(gl_FragCoord.xy + 0.03*time * 9.1 + 13.91);
       
       int prev = get(0, 0);
 
@@ -140,15 +144,8 @@
 
       //////// FIRE RULES ///////
 
-      if (1==match(mat3(
-          _, _, _,
-          _, _, _,
-          _, V, _))) {
-        r = F;
-      }
-      else 
       if (
-       // Fire rule with Water interaction
+       // Fire grow / Fire + Water
        match(mat3(
          W, W, W, // If water drop...
          W, W, W, // ...or water nearby.
@@ -164,40 +161,9 @@
 
       ////// WATER RULES ///////
 
-      if (1==match(mat3(
-          _, S, _,
-          _, _, _,
-          _, _, _))) {
-        r = W;
-      }
-      else if (
-        prev == N &&
-        oo < 0.95 && (
-        matchAll(mat3(
-          W, _, _,
-          _, _, _,
-          E, _, _))
-        ||
-        matchAll(mat3(
-          _, _, W,
-          _, _, _,
-          _, _, E))
-        )
-        ||
-        oo < 0.88 && (
-        matchAll(mat3(
-          _, _, _,
-          W, _, _,
-          E, _, _))
-        ||
-        matchAll(mat3(
-          _, _, _,
-          _, _, W,
-          _, _, E))
-        )) {
-        r = W;
-      }
-      else if (between(match(mat3(
+      if (
+      // Water drop / Water + Fire
+       between(match(mat3(
          W, W, W,
          W, F, W,
          _, F, _
@@ -205,14 +171,64 @@
          0.3, 0.9, 0.3,
          0.1, -0.3, 0.1,
          0.0, -0.3, 0.0
-       )), 0.99 - 0.61 * o, 1.5 + 0.5 * oo)) {
+       )), 0.9 - 0.6 * o, 1.4 + 0.3 * oo)
+       ||
+       // Water Slide rules
+       (
+        prev == N && (
+          oo < 0.95 && (
+          matchAll(mat3(
+            W, _, _,
+            _, _, _,
+            E, _, _))
+          ||
+          matchAll(mat3(
+            _, _, W,
+            _, _, _,
+            _, _, E))
+          )
+          ||
+          oo < 0.88 && (
+          matchAll(mat3(
+            _, _, _,
+            W, _, _,
+            E, _, _))
+          ||
+          matchAll(mat3(
+            _, _, _,
+            _, _, W,
+            _, _, E))
+          )))) {
         r = W;
       }
 
       ////// EARTH RULES ////
 
       if (prev == E) {
-        if (oo>0.96 && (
+        r = E;
+
+        // Earth -> Source
+        if (o<0.03 && (
+        match(mat3(
+          W, W, W,
+          W, _, W,
+          W, W, W
+        ), mat3(
+         1.0, 1.2, 1.0,
+         0.5, 0.0, 0.5,
+         0.3, 0.2, 0.3
+        ))>3.0 - 2.5*oo
+        ||
+        1<=match(mat3(
+          _, S, _,
+          S, _, S,
+          _, _, _
+        )))) {
+          r = S;
+        }
+
+        // Earth -> Volcano
+        if (oo>0.99 && (
         match(mat3(
           F, F, F,
           F, _, F,
@@ -223,46 +239,124 @@
          1.0, 1.2, 1.0
         ))>3.0 - 2.1*o
         ||
-        2==match(mat3(
+        2<=match(mat3(
           _, _, _,
           V, _, V,
           V, V, V
         )))) {
           r = V;
         }
-        else {
-          r = E;
-        }
       }
 
       ////// VOLCANO RULES /////
+      
+      // Volcano creates fire
+      if ((prev==N || prev==F) && matchAll(mat3(
+          _, _, _,
+          _, _, _,
+          _, V, _))) {
+        r = F;
+      }
 
       if (prev == V) {
+        r = V;
+
+        // if Water: Volcano -> Earth
         if (matchAny(mat3(
-          _, W, _,
+          W, W, W,
           W, _, W,
           _, _, _
         ))) {
           r = E;
         }
-        else {
-          r = V;
+
+        // cool down: Volcano -> Earth
+        if (oo<0.005 && !matchAny(mat3(
+          _, _, _,
+          _, _, _,
+          F, F, F
+        )) && !matchAny(mat3(
+          _, _, _,
+          _, _, _,
+          V, V, V
+        ))) {
+          r = E;
         }
+
+        // Volcano <-> Source : A volcano can disappear near source
+        if (matchAny(mat3(
+          S, S, S,
+          S, _, S,
+          S, S, S
+        ))) {
+          if (o < 0.3) {
+            r = V;
+          }
+          else if (o < 0.5) {
+            r = S;
+          }
+          else {
+            r = E;
+          }
+        }
+        
       }
 
       ////// SOURCE RULES /////
 
+      if ((prev==N || prev==W) && match(mat3(
+          S, S, S,
+          S, _, S,
+          _, _, _), mat3(
+          0.9, 1.0, 0.9,
+          0.7, 0.0, 0.7,
+          0.0, 0.0, 0.0
+        )) >= 1.0 - 0.3*o) {
+        r = W;
+      }
+
       if (prev == S) {
-        if (matchAny(mat3(
+        r = S;
+
+        // Dry: Source -> Earth
+        if (oo<0.05 && !matchAny(mat3(
+          W, W, W,
           _, _, _,
-          F, _, F,
-          _, F, _
+          _, _, _
+        )) && !matchAny(mat3(
+          S, S, S,
+          _, _, _,
+          _, _, _
         ))) {
           r = E;
         }
-        else {
-          r = S;
+
+        // if Fire: Source -> Earth
+        if (matchAny(mat3(
+          _, _, _,
+          F, _, F,
+          F, F, F
+        ))) {
+          r = E;
         }
+
+        // Volcano <-> Source : A source can disappear near volcano
+        if (matchAny(mat3(
+          V, V, V,
+          V, _, V,
+          V, V, V
+        ))) {
+          if (o < 0.2) {
+            r = V;
+          }
+          else if (o < 0.6) {
+            r = S;
+          }
+          else {
+            r = E;
+          }
+        }
+
       }
 
       ///// Return the color result /////
