@@ -1,6 +1,10 @@
-var size = 128;
-C.width = C.height = size * 4;
-var gl = C.getContext("webgl") || C.getContext("experimental-webgl");
+// Game states
+var worldSize = [ 300, 100 ];
+var resolution = [ 600, 500 ];
+var zoom = 4;
+var camera = [ 0, -50 ]; // Camera is in resolution coordinate (not worldSize)
+
+// Game constants
 
 var updateRate = 50;
 
@@ -16,6 +20,12 @@ var colors = [
 
   0.66, 0.71, 0.71  // 6: air (aka wind)
 ];
+
+
+C.width = resolution[0];
+C.height = resolution[1];
+var gl = C.getContext("webgl") || C.getContext("experimental-webgl");
+
 
 var shader, shaderSrc, shaderType, program;
 
@@ -47,9 +57,7 @@ gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
 
 gl.viewport(0, 0, C.width, C.height);
-var resolutionLocation = gl.getUniformLocation(program, "resolution");
-gl.uniform2f(resolutionLocation, C.width, C.height);
-var x1 = 0, y1 = 0, x2 = C.width, y2 = C.height;
+var x1 = 0, y1 = 0, x2 = resolution[0], y2 = resolution[1];
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
       x1, y1,
       x2, y1,
@@ -59,10 +67,17 @@ gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
       x2, y2]), gl.STATIC_DRAW);
 
 var renderTimeL = gl.getUniformLocation(program, "time");
-var renderLogicL = gl.getUniformLocation(program, "logic");
-var renderSizeL = gl.getUniformLocation(program, "size");
+var renderZoomL = gl.getUniformLocation(program, "zoom");
+var renderStateL = gl.getUniformLocation(program, "state");
+var renderWorldSizeL = gl.getUniformLocation(program, "worldSize");
+var cameraL = gl.getUniformLocation(program, "camera");
+var resolutionL = gl.getUniformLocation(program, "resolution");
 
-gl.uniform2fv(renderSizeL, [size, size]);
+gl.uniform1i(renderStateL, 0);
+gl.uniform2fv(renderWorldSizeL, worldSize);
+gl.uniform1f(renderZoomL, zoom);
+gl.uniform2fv(resolutionL, resolution);
+gl.uniform2fv(cameraL, camera);
 
 var renderProgram = program;
 
@@ -100,10 +115,10 @@ function affectColor (buf, i, c) {
   buf[i+3] = 255;
 }
 
-var perlin = generatePerlinNoise(size, size);
-var perlin2 = generatePerlinNoise(size, size);
+var perlin = generatePerlinNoise(worldSize[0], worldSize[1]);
+var perlin2 = generatePerlinNoise(worldSize[0], worldSize[1]);
 
-var data = new Uint8Array(4 * size * size);
+var data = new Uint8Array(4 * worldSize[0] * worldSize[1]);
 for(var i = 0; i < data.length; i += 4) {
   var r = Math.floor(Math.random() * colors.length);
   //affectColor(data, i, r);
@@ -115,7 +130,7 @@ for(var i = 0; i < data.length; i += 4) {
 var logicTexture = gl.createTexture();
 gl.activeTexture(gl.TEXTURE0);
 gl.bindTexture(gl.TEXTURE_2D, logicTexture);
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, worldSize[0], worldSize[1], 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -126,7 +141,7 @@ gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, log
 
 gl.useProgram(program);
 gl.uniform1i(logicStateL, 0);
-gl.uniform2fv(logicSizeL, [size, size]);
+gl.uniform2fv(logicSizeL, worldSize);
 gl.uniform3fv(logicColorsL, colors);
 
 var logicProgram = program;
@@ -147,8 +162,8 @@ var start = Date.now();
 (function render () {
   var time = (Date.now()-start)/1000;
   gl.useProgram(renderProgram);
-  gl.uniform1i(renderLogicL, 0);
   gl.uniform1f(renderTimeL, time);
+  gl.uniform2fv(cameraL, camera);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);

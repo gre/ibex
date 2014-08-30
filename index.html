@@ -50,7 +50,7 @@
       * Source + Nothing => creates Water (on bottom).
       * Volcano + Nothing => creates Fire (on top)
  TODO     * Volcano + Source => IF source on top of volcano: sometimes creates Ground. OTHERWISE: sometimes creates volcano.
- TODO     * Volcano + Water => rarely creates Source.
+      * Volcano + Water => rarely creates Source.
       * Earth + Volcano => rarely Volcano expand / grow up in the Earth.
       * Earth + Source => rarely Source expand / infiltrate in the Earth.
       * Source + Fire => Source die.
@@ -72,10 +72,13 @@
     uniform vec3 colors[_];
 
     vec4 getColor(ivec2 position) {
-      return texture2D(state, mod((gl_FragCoord.xy + vec2(position)*vec2(1.0, -1.0)/* quick fix for the currently reversed Y ...*/) / size, vec2(1.0)));
+      vec2 uv = (gl_FragCoord.xy + vec2(position)*vec2(1.0, -1.0)/* quick fix for the currently reversed Y ...*/) / size;
+      if (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0)
+        return vec4(colors[0], 0.0);
+      return texture2D(state, uv);
     }
-    int get (ivec2 position) {
-      vec3 cmp = getColor(position).rgb;
+    int get (ivec2 pos) {
+      vec3 cmp = getColor(pos).rgb;
       for (int i=0; i<_; ++i) {
         vec3 ref = colors[i];
         if (distance(cmp, ref) < 0.01)
@@ -370,22 +373,36 @@
   </script>
   <script id="fragmentRender" type="x-shader/x-fragment">
     precision highp float;
-    uniform vec2 size;
-    uniform vec2 resolution;
+
+    #define OUTCOLOR vec4(0.0)
+
     uniform float time;
-    uniform sampler2D logic;
+    uniform sampler2D state;
+
+    uniform vec2 worldSize;
+    uniform vec2 resolution;
+
+    uniform float zoom;
+    uniform vec2 camera;
 
     float rand(vec2 co){
       return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
     }
     
     void main () {
-      vec2 ratio = resolution / size;
-      vec2 p = ratio * (floor(gl_FragCoord.xy / ratio) + 0.5) / resolution;
-      gl_FragColor = -(0.05*rand(p+time/1000.0)) + texture2D(logic, p /*+ 0.002*vec2(
-        cos(2.3*time+07.0*p.x+0.5*rand(p+time/100.0)),
-        sin(2.0*time+15.0*p.y+0.1*rand(p+time/1000.0)
-      ))*/);
+      vec2 disp = 0.5*vec2(
+        cos(2.3*time+0.03*gl_FragCoord.x+0.5*rand(gl_FragCoord.xy+time/100.0)),
+        sin(2.0*time+0.04*gl_FragCoord.y+0.1*rand(gl_FragCoord.xy+time/1000.0))
+      );
+      vec4 colorAdd = vec4(vec3(-(0.05*rand(gl_FragCoord.xy+time/80.0))), 1.0);
+
+      // Compute where the camera/zoom is in the state texture
+      vec2 statePos = (gl_FragCoord.xy + disp + camera) / zoom;
+      vec2 stateBound = worldSize;
+      vec2 uv = (floor(statePos) + 0.5) / stateBound;
+      vec4 stateColor = uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0 ? OUTCOLOR : texture2D(state, uv);
+
+      gl_FragColor = colorAdd + stateColor;
     }
   </script>
   <script src="index.js"></script>
