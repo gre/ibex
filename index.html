@@ -69,6 +69,11 @@
     uniform float time;
     uniform sampler2D state;
 
+    uniform bool draw;
+    uniform ivec2 drawPosition;
+    uniform float drawRadius;
+    uniform int drawObject;
+
     uniform vec3 colors[_];
 
     vec4 getColor(ivec2 position) {
@@ -138,12 +143,24 @@
     }
 
     void main () {
-      float o = rand(gl_FragCoord.xy + 0.01*time * 0.1);
-      float oo = rand(gl_FragCoord.xy + 0.03*time * 9.1 + 13.91);
       
       int prev = get(0, 0);
 
+      float o = rand(gl_FragCoord.xy + 0.01*time * 0.1);
+      float oo = rand(gl_FragCoord.xy + 0.03*time * 9.1 + 13.91);
+
       int r = N;
+
+      if (draw) {
+        vec2 pos = floor(gl_FragCoord.xy);
+        if (distance(pos, vec2(drawPosition)) <= drawRadius) {
+          r = drawObject;
+        }
+        else {
+          r = prev;
+        }
+      }
+      else {
 
       //////// FIRE RULES ///////
 
@@ -369,6 +386,7 @@
 
       }
 
+      }
       ///// Return the color result /////
 
       vec3 c;AC(0)AC(1)AC(2)AC(3)AC(4)AC(5)AC(6)gl_FragColor=vec4(c,1.0); //: gl_FragColor=vec4(colors[r], 1.0);

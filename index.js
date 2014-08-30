@@ -4,6 +4,11 @@ var resolution = [ 600, 500 ];
 var zoom = 4;
 var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
 
+var draw = 0;
+var drawPosition;
+var drawObject;
+var drawRadius;
+
 // Game constants
 
 var updateRate = 50;
@@ -27,14 +32,28 @@ var colors = [
 window.addEventListener("resize", onResize);
 
 var drag;
+var mousedownTime;
 var dragCam;
+
+function posToWorld (p) {
+  return [ (camera[0] + p[0]) / zoom, (camera[1] + resolution[1] - p[1]) / zoom ];
+}
 
 C.addEventListener("mousedown", function (e) {
   e.preventDefault();
   drag = posE(e);
+  mousedownTime = Date.now();
   dragCam = [].concat(camera);
 });
 C.addEventListener("mouseup", function (e) {
+  var dx = camera[0] - dragCam[0];
+  var dy = camera[1] - dragCam[1];
+  var dragged = Date.now() - mousedownTime > 300 || dx*dx+dy*dy > 64;
+  if (!dragged) {
+    draw = 1;
+    drawPosition = posToWorld(posE(e));
+    drawRadius = 8;
+  }
   drag = null;
 });
 C.addEventListener("mousemove", function (e) {
@@ -64,6 +83,11 @@ document.addEventListener("keydown", function (e) {
   }
   camera[0] += 8 * dx;
   camera[1] += 8 * dy;
+
+  if (e.keyCode == 86) drawObject = 4;
+  if (e.keyCode == 78) drawObject = 0;
+  if (e.keyCode == 83) drawObject = 5;
+  
   if (dx || dy)
     e.preventDefault();
 });
@@ -160,7 +184,12 @@ var logicTimeL = gl.getUniformLocation(program, "time");
 var logicColorsL = gl.getUniformLocation(program, "colors");
 var logicStateL = gl.getUniformLocation(program, "state");
 var logicSizeL = gl.getUniformLocation(program, "size");
+var logicDrawL = gl.getUniformLocation(program, "draw");
+var logicDrawPositionL = gl.getUniformLocation(program, "drawPosition");
+var logicDrawObjectL = gl.getUniformLocation(program, "drawObject");
+var logicDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
 var logicPositionL = gl.getAttribLocation(program, "position");
+
 gl.enableVertexAttribArray(logicPositionL);
 
 function affectColor (buf, i, c) {
@@ -207,6 +236,15 @@ var start = Date.now();
   var time = (Date.now()-start)/1000;
   gl.useProgram(logicProgram);
   gl.uniform1f(logicTimeL, time);
+
+  gl.uniform1i(logicDrawL, draw);
+  if (draw) {
+    draw = 0;
+    gl.uniform2iv(logicDrawPositionL, drawPosition);
+    gl.uniform1f(logicDrawRadiusL, drawRadius);
+    gl.uniform1i(logicDrawObjectL, drawObject);
+  }
+
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(logicPositionL, 2, gl.FLOAT, gl.FALSE, 0, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, logicFramebuffer);
