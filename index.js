@@ -177,10 +177,10 @@ for(var i = 0; i < data.length; i += 4) {
   var r = perlin[i / 4];
   //affectColor(data, i, r);
   if (r < 0.35) affectColor(data, i, 1);
-  if (r < 0.25) affectColor(data, i, 4);
+  if (r < 0.15) affectColor(data, i, 4);
 
   if (0.60 < r) affectColor(data, i, 1);
-  if (0.80 < r) affectColor(data, i, 5);
+  if (0.85 < r) affectColor(data, i, 5);
 }
 
 var logicTexture = gl.createTexture();
