@@ -39,6 +39,10 @@ function posToWorld (p) {
   return [ (camera[0] + p[0]) / zoom, (camera[1] + resolution[1] - p[1]) / zoom ];
 }
 
+C.addEventListener("mouseleave", function (e) {
+  drag = null;
+});
+
 C.addEventListener("mousedown", function (e) {
   e.preventDefault();
   drag = posE(e);
