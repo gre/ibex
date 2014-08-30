@@ -390,11 +390,13 @@
     }
     
     void main () {
-      vec2 disp = 0.5*vec2(
-        cos(2.3*time+0.03*gl_FragCoord.x+0.5*rand(gl_FragCoord.xy+time/100.0)),
-        sin(2.0*time+0.04*gl_FragCoord.y+0.1*rand(gl_FragCoord.xy+time/1000.0))
-      );
-      vec4 colorAdd = vec4(vec3(-(0.05*rand(gl_FragCoord.xy+time/80.0))), 1.0);
+      /*
+      vec2 disp = 1.0*vec2(
+        cos(2.3*time+0.03*gl_FragCoord.x+0.5),
+        sin(2.0*time+0.04*gl_FragCoord.y+0.1)
+        );
+        */
+      float disp = 0.0;
 
       // Compute where the camera/zoom is in the state texture
       vec2 statePos = (gl_FragCoord.xy + disp + camera) / zoom;
@@ -402,7 +404,18 @@
       vec2 uv = (floor(statePos) + 0.5) / stateBound;
       vec4 stateColor = uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0 ? OUTCOLOR : texture2D(state, uv);
 
-      gl_FragColor = colorAdd + stateColor;
+
+      vec2 pixelPos = fract(statePos);
+
+      vec3 noiseColor = vec3(0.02) * vec3(
+        rand(zoom*floor(gl_FragCoord.xy/zoom)+time/31.0),
+        rand(zoom*floor(gl_FragCoord.xy/zoom)+time/80.1),
+        rand(zoom*floor(gl_FragCoord.xy/zoom)+time/13.2)
+      );
+
+      vec3 pixelColor = -vec3(0.03) * (pixelPos.x - pixelPos.y);
+
+      gl_FragColor = vec4(noiseColor + pixelColor, 1.0) + stateColor;
     }
   </script>
   <script src="index.js"></script>

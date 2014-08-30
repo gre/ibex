@@ -1,9 +1,10 @@
-html{
+html,body {
   color: #FFF;
   background: #222;
-  text-align: center;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 #C {
-  border: 1px solid #000;
 }

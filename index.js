@@ -1,8 +1,8 @@
 // Game states
-var worldSize = [ 300, 100 ];
+var worldSize = [ 300, 200 ];
 var resolution = [ 600, 500 ];
 var zoom = 4;
-var camera = [ 0, -50 ]; // Camera is in resolution coordinate (not worldSize)
+var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
 
 // Game constants
 
@@ -22,8 +22,56 @@ var colors = [
 ];
 
 
-C.width = resolution[0];
-C.height = resolution[1];
+// Game events
+
+window.addEventListener("resize", onResize);
+
+var drag;
+var dragCam;
+
+C.addEventListener("mousedown", function (e) {
+  e.preventDefault();
+  drag = posE(e);
+  dragCam = [].concat(camera);
+});
+C.addEventListener("mouseup", function (e) {
+  drag = null;
+});
+C.addEventListener("mousemove", function (e) {
+  if (drag) {
+    e.preventDefault();
+    var p = posE(e);
+    var dx = p[0] - drag[0];
+    var dy = -(p[1] - drag[1]);
+    camera = [ dragCam[0] - dx, dragCam[1] - dy ];
+  }
+});
+
+function posE (e) {
+  return [ e.clientX, e.clientY ];
+}
+
+document.addEventListener("keydown", function (e) {
+//
+//       38
+//    37 40 39
+  var dx = 0, dy = 0;
+  switch (e.which) {
+    case 38: dy = 1; break;
+    case 40: dy = -1; break;
+    case 37: dx = -1; break;
+    case 39: dx = 1; break;
+  }
+  camera[0] += 8 * dx;
+  camera[1] += 8 * dy;
+  if (dx || dy)
+    e.preventDefault();
+});
+
+
+//////////////////////////////////////
+
+
 var gl = C.getContext("webgl") || C.getContext("experimental-webgl");
 
 
@@ -56,15 +104,7 @@ gl.enableVertexAttribArray(renderPositionL);
 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
 
-gl.viewport(0, 0, C.width, C.height);
-var x1 = 0, y1 = 0, x2 = resolution[0], y2 = resolution[1];
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-      x1, y1,
-      x2, y1,
-      x1, y2,
-      x1, y2,
-      x2, y1,
-      x2, y2]), gl.STATIC_DRAW);
+onResize();
 
 var renderTimeL = gl.getUniformLocation(program, "time");
 var renderZoomL = gl.getUniformLocation(program, "zoom");
@@ -76,8 +116,23 @@ var resolutionL = gl.getUniformLocation(program, "resolution");
 gl.uniform1i(renderStateL, 0);
 gl.uniform2fv(renderWorldSizeL, worldSize);
 gl.uniform1f(renderZoomL, zoom);
-gl.uniform2fv(resolutionL, resolution);
 gl.uniform2fv(cameraL, camera);
+
+function onResize () {
+  resolution = [ window.innerWidth, window.innerHeight ];
+  C.width = resolution[0];
+  C.height = resolution[1];
+  gl.viewport(0, 0, C.width, C.height);
+  var x1 = 0, y1 = 0, x2 = resolution[0], y2 = resolution[1];
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        x1, y1,
+        x2, y1,
+        x1, y2,
+        x1, y2,
+        x2, y1,
+        x2, y2]), gl.STATIC_DRAW);
+  gl.uniform2fv(resolutionL, resolution);
+}
 
 var renderProgram = program;
 
@@ -115,16 +170,17 @@ function affectColor (buf, i, c) {
   buf[i+3] = 255;
 }
 
-var perlin = generatePerlinNoise(worldSize[0], worldSize[1]);
-var perlin2 = generatePerlinNoise(worldSize[0], worldSize[1]);
+var perlin = generatePerlinNoise(worldSize[0], worldSize[1], 5, 0.1, 0.03);
 
 var data = new Uint8Array(4 * worldSize[0] * worldSize[1]);
 for(var i = 0; i < data.length; i += 4) {
-  var r = Math.floor(Math.random() * colors.length);
+  var r = perlin[i / 4];
   //affectColor(data, i, r);
-  if (perlin[i/4] > 0.55) affectColor(data, i, 1);
-  if (perlin[i/4] > 0.8) affectColor(data, i, 4);
-  if (perlin2[i/4] < 0.15) affectColor(data, i, 5);
+  if (r < 0.35) affectColor(data, i, 1);
+  if (r < 0.25) affectColor(data, i, 4);
+
+  if (0.60 < r) affectColor(data, i, 1);
+  if (0.80 < r) affectColor(data, i, 5);
 }
 
 var logicTexture = gl.createTexture();
@@ -171,12 +227,7 @@ var start = Date.now();
 }());
 
 
-
-function generatePerlinNoise(width, height, options) {
-  options = options || {};
-  var octaveCount = options.octaveCount || 4;
-  var amplitude = options.amplitude || 0.1;
-  var persistence = options.persistence || 0.2;
+function generatePerlinNoise(width, height, octaveCount, amplitude, persistence) {
   var whiteNoise = generateWhiteNoise(width, height);
 
   var smoothNoiseList = new Array(octaveCount);
