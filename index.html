@@ -286,8 +286,8 @@
     }
     
     void main () {
-      vec2 ratio = vec2(1.0);//resolution / size;
-      vec2 p = ratio * floor(gl_FragCoord.xy / ratio + 0.5) / resolution;
+      vec2 ratio = resolution / size;
+      vec2 p = ratio * (floor(gl_FragCoord.xy / ratio) + 0.5) / resolution;
       gl_FragColor = -(0.05*rand(p+time/1000.0)) + texture2D(logic, p /*+ 0.002*vec2(
         cos(2.3*time+07.0*p.x+0.5*rand(p+time/100.0)),
         sin(2.0*time+15.0*p.y+0.1*rand(p+time/1000.0)
