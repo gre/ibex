@@ -1,4 +1,7 @@
+Math.seedrandom(0);
+
 // Game states
+var tick = 0;
 var worldSize = [ 600, 250 ];
 var resolution = [ 600, 500 ];
 var zoom = 4;
@@ -186,7 +189,7 @@ gl.attachShader(program, shader);
 gl.linkProgram(program);
 validateProg(program);
 
-var logicTimeL = gl.getUniformLocation(program, "time");
+var logicTickL = gl.getUniformLocation(program, "tick");
 var logicColorsL = gl.getUniformLocation(program, "colors");
 var logicStateL = gl.getUniformLocation(program, "state");
 var logicSizeL = gl.getUniformLocation(program, "size");
@@ -254,9 +257,8 @@ var logicProgram = program;
 
 var start = Date.now();
 (function update () {
-  var time = (Date.now()-start)/1000;
   gl.useProgram(logicProgram);
-  gl.uniform1f(logicTimeL, time);
+  gl.uniform1f(logicTickL, tick);
 
   gl.uniform1i(logicDrawL, draw);
   if (draw) {
@@ -271,6 +273,8 @@ var start = Date.now();
   gl.bindFramebuffer(gl.FRAMEBUFFER, logicFramebuffer);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+  tick ++;
   setTimeout(update, updateRate);
 }());
 

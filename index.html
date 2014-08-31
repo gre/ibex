@@ -15,6 +15,7 @@
   </script>
   <script id="fragmentLogic" type="x-shader/x-fragment">
     #define AC(a) if(r==a)c=colors[a];
+    #define RAND (seed=vec2(rand(seed), rand(seed+9.))).x
 
     // Elements
     #define N 0
@@ -66,7 +67,7 @@
   
     precision highp float;
     uniform vec2 size;
-    uniform float time;
+    uniform float tick;
     uniform sampler2D state;
 
     uniform bool draw;
@@ -146,8 +147,7 @@
       
       int prev = get(0, 0);
 
-      float o = rand(gl_FragCoord.xy + 0.01*time * 0.1);
-      float oo = rand(gl_FragCoord.xy + 0.03*time * 9.1 + 13.91);
+      vec2 seed = gl_FragCoord.xy + 0.001 * tick;
 
       int r = N;
 
@@ -174,7 +174,7 @@
          -0.05, -0.3, -0.05, // Negative weights because water kill fire.
          -0.5, -0.6, -0.5,
          0.35, 0.9, 0.35 // Weights for the Fire
-       )) >= 0.9 - 0.6 * oo // The sum of matched weights must be enough important, also with some randomness
+       )) >= 0.9 - 0.6 * RAND // The sum of matched weights must be enough important, also with some randomness
       ) {
         r = F;
       }
@@ -191,12 +191,12 @@
          0.3, 0.9, 0.3,
          0.1, -0.6, 0.1,
          0.0, -0.4, 0.0
-       )), 0.9 - 0.6 * o, 1.4 + 0.3 * oo)
+       )), 0.9 - 0.6 * RAND, 1.4 + 0.3 * RAND)
        ||
        // Water Slide rules
        (
         prev == N && (
-          oo < 0.97 && (
+          RAND < 0.97 && (
           matchAll(mat3(
             W, _, _,
             _, _, _,
@@ -208,7 +208,7 @@
             _, _, E))
           )
           ||
-          oo < 0.92 && (
+          RAND < 0.92 && (
           matchAll(mat3(
             _, _, _,
             W, _, _,
@@ -229,7 +229,7 @@
 
         // Earth -> Source
         if (
-        o<0.01 &&
+        RAND<0.01 &&
         match(mat3(
           W, W, W,
           W, _, W,
@@ -238,10 +238,10 @@
          1.0, 1.2, 1.0,
          0.5, 0.0, 0.5,
          0.3, 0.2, 0.3
-        ))>3.0 - 2.5*oo
+        ))>3.0 - 2.5*RAND
         ||
 
-        o < 0.03 &&
+        RAND < 0.03 &&
         1<=match(mat3(
           _, S, _,
           S, _, S,
@@ -252,7 +252,7 @@
 
         // Earth -> Volcano
         if (
-        oo < 0.006 && 
+        RAND < 0.006 && 
         match(mat3(
           F, F, F,
           F, _, F,
@@ -261,11 +261,11 @@
          0.3, 0.2, 0.3,
          0.5, 0.0, 0.5,
          1.0, 1.2, 1.0
-        ))>3.0 - 2.1*o
+        ))>3.0 - 2.1*RAND
 
         ||
 
-        oo < 0.01 &&
+        RAND < 0.01 &&
         2<=match(mat3(
           _, _, _,
           V, _, V,
@@ -298,7 +298,7 @@
         }
 
         // cool down: Volcano -> Earth
-        if (oo<0.005 && !matchAny(mat3(
+        if (RAND<0.005 && !matchAny(mat3(
           _, _, _,
           _, _, _,
           F, F, F
@@ -316,10 +316,10 @@
           S, _, S,
           S, S, S
         ))) {
-          if (o < 0.3) {
+          if (RAND < 0.3) {
             r = V;
           }
-          else if (o < 0.6) {
+          else if (RAND < 0.6) {
             r = S;
           }
           else {
@@ -338,7 +338,7 @@
           0.9, 1.0, 0.9,
           0.7, 0.0, 0.7,
           0.0, 0.0, 0.0
-        )) >= 1.0 - 0.3*o) {
+        )) >= 1.0 - 0.3*RAND) {
         r = W;
       }
 
@@ -346,7 +346,7 @@
         r = S;
 
         // Dry: Source -> Earth
-        if (oo<0.06 && !matchAny(mat3(
+        if (RAND<0.06 && !matchAny(mat3(
           W, W, W,
           _, _, _,
           _, _, _
@@ -373,10 +373,10 @@
           V, _, V,
           V, V, V
         ))) {
-          if (o < 0.2) {
+          if (RAND < 0.2) {
             r = V;
           }
-          else if (o < 0.6) {
+          else if (RAND < 0.6) {
             r = S;
           }
           else {
@@ -443,6 +443,7 @@
       gl_FragColor = vec4(noiseColor + pixelColor, 1.0) + stateColor;
     }
   </script>
+  <script src="seedrandom.min.js"></script>
   <script src="index.js"></script>
 </body>
 </html>
