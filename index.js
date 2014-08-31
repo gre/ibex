@@ -254,7 +254,11 @@ gl.uniform3fv(logicColorsL, colors);
 var logicProgram = program;
 
 var start = Date.now();
-(function update () {
+var lastUpdate = 0;
+function update () {
+  var now = Date.now();
+  if (now-lastUpdate < updateRate) return;
+  lastUpdate = now;
   gl.useProgram(logicProgram);
   gl.uniform1f(logicTickL, tick);
 
@@ -273,10 +277,10 @@ var start = Date.now();
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
   tick ++;
-  setTimeout(update, updateRate);
-}());
+}
 
 (function render () {
+  update();
   var time = (Date.now()-start)/1000;
   gl.useProgram(renderProgram);
   gl.uniform1f(renderTimeL, time);
