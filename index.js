@@ -1,5 +1,5 @@
 // Game states
-var worldSize = [ 300, 200 ];
+var worldSize = [ 600, 250 ];
 var resolution = [ 600, 500 ];
 var zoom = 4;
 var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
@@ -12,6 +12,8 @@ var drawRadius;
 // Game constants
 
 var updateRate = 50;
+
+updateRate = 0;
 
 var colors = [
   0.11, 0.16, 0.23, // 0: air
@@ -196,6 +198,10 @@ var logicPositionL = gl.getAttribLocation(program, "position");
 
 gl.enableVertexAttribArray(logicPositionL);
 
+function step (a, b, x) {
+  return Math.max(0, Math.min((x-a) / (b-a), 1));
+}
+
 function affectColor (buf, i, c) {
   buf[i+0] = 255 * colors[c * 3+0];
   buf[i+1] = 255 * colors[c * 3+1];
@@ -207,13 +213,24 @@ var perlin = generatePerlinNoise(worldSize[0], worldSize[1], 5, 0.1, 0.03);
 
 var data = new Uint8Array(4 * worldSize[0] * worldSize[1]);
 for(var i = 0; i < data.length; i += 4) {
-  var r = perlin[i / 4];
-  //affectColor(data, i, r);
-  if (r < 0.35) affectColor(data, i, 1);
-  if (r < 0.15) affectColor(data, i, 4);
+  var j = i / 4;
+  var r = perlin[j];
+  var x = j % worldSize[0];
+  var y = Math.floor(j / worldSize[0]);
+
+  if (r < 0.3 + 0.6 * step(20, 0, y) - step(worldSize[1]-60, worldSize[1], y) || r > 0.65 - 0.4 * step(30, 0, y) + 0.2 * step(worldSize[1]-30, worldSize[1], y) ) {
+    // Earth
+    affectColor(data, i, 1);
+    // Volcano
+    if (r < 0.3 * step(80, 0, y)) affectColor(data, i, 4);
+    // Source
+    if (r > 1.0 - 0.2 * step(worldSize[1] - 150, worldSize[1], y)) affectColor(data, i, 5);
+  }
+  /*
 
   if (0.60 < r) affectColor(data, i, 1);
   if (0.85 < r) affectColor(data, i, 5);
+  */
 }
 
 var logicTexture = gl.createTexture();
