@@ -14,9 +14,7 @@ var drawRadius;
 
 // Game constants
 
-var updateRate = 50;
-
-updateRate = 0;
+var updateRate = 40;
 
 var colors = [
   0.11, 0.16, 0.23, // 0: air
