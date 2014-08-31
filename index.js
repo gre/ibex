@@ -1,9 +1,9 @@
-Math.seedrandom(0);
+Math.seedrandom(Math.floor(Date.now() / 60000));
 
 // Game states
 var tick = 0;
-var worldSize = [ 600, 250 ];
-var resolution = [ 600, 500 ];
+var worldSize = [ 768, 256 ];
+var resolution;
 var zoom = 4;
 var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
 
@@ -12,9 +12,11 @@ var drawPosition;
 var drawObject;
 var drawRadius;
 
+var animals = [];
+
 // Game constants
 
-var updateRate = 40;
+var updateRate = 35;
 
 var colors = [
   0.11, 0.16, 0.23, // 0: air
@@ -100,6 +102,97 @@ document.addEventListener("keydown", function (e) {
 });
 
 
+/////////// ANIMAL ///////////////////
+
+var sightw = 32, sighth = 12;
+var sighthalfw = sightw / 2, sighthalfh = sighth / 2;
+var animalPixelBuf = new Uint8Array(sightw * sighth * 4);
+
+function Animal (pos) {
+  // The buffer of the animal is its vision
+  this.p = pos;
+  this.v = [0, 0];
+  this.b = new Uint8Array(sightw * sighth);
+}
+
+function parseColors (bufin, bufout) {
+  // bufin: RGBA colors, bufout: element indexes
+  // bufin size == 4 * bufout size
+  for (var i=0; i<bufin.length; i += 4) {
+    for (var c=0; c<colors.length; c += 3) {
+      var diff = 0;
+      for (var j=0; j<3; ++j) {
+        var d = colors[c + j] - (bufin[i+j]/256);
+        diff += d * d;
+      }
+      if (diff < 0.001) break;
+    }
+    bufout[i/4] = c / 3;
+  }
+}
+
+// Animal functions
+// I'm not doing prototype to save bytes (better limit the usage of fields which are hard to minimize)
+
+function readAnimalSight (animal) {
+  gl.readPixels(animal.p[0] - sighthalfw, animal.p[1] - sighthalfh, sightw, sighth, gl.RGBA, gl.UNSIGNED_BYTE, animalPixelBuf);
+  parseColors(animalPixelBuf, animal.b);
+}
+
+function animalAI (animal) {
+  // TODO
+}
+
+function ground (i) {
+  return i == 1 || i == 4 || i == 5;
+}
+
+function animalUpdate (animal) {
+  var i, y;
+  readAnimalSight(animal);
+
+    animal.p[0] += animal.v[0];
+    animal.p[1] += animal.v[1];
+
+  // Ground will push up
+  y = 0;
+  do {
+    i = sightw * (sighthalfh + y) + sighthalfw;
+    y ++;
+  } while (0 <= i && i < sightw * sighth && ground(animal.b[i]));
+
+  readAnimalSight(animal);
+  animal.p[1] += y;
+
+  y = 1;
+  do {
+    i = sightw * (sighthalfh + y) + sighthalfw;
+    y --;
+  } while (0 <= i && i < sightw * sighth && !ground(animal.b[i]));
+  y ++;
+
+  animal.p[1] += y;
+
+  /*
+  for (
+    i = sightw*(1+sighthalfh) + sighthalfw;
+    i > 0 && ground(animal.b[i]);
+    i -= sightw, animal.p[1] ++
+  ) {
+  }
+  */
+
+  // Gravity
+  /*
+  for (
+    i = sightw*(-1+sighthalfh) + sighthalfw;
+    i < sightw * sighth && !ground(animal.b[i]);
+    i += sightw, animal.p[1] --
+  ) {
+  }
+  */
+}
+
 //////////////////////////////////////
 
 
@@ -141,13 +234,13 @@ var renderTimeL = gl.getUniformLocation(program, "time");
 var renderZoomL = gl.getUniformLocation(program, "zoom");
 var renderStateL = gl.getUniformLocation(program, "state");
 var renderWorldSizeL = gl.getUniformLocation(program, "worldSize");
+var renderAnimalsL = gl.getUniformLocation(program, "animals");
+var renderAnimalsLengthL = gl.getUniformLocation(program, "animalsLength");
 var cameraL = gl.getUniformLocation(program, "camera");
 var resolutionL = gl.getUniformLocation(program, "resolution");
 
 gl.uniform1i(renderStateL, 0);
 gl.uniform2fv(renderWorldSizeL, worldSize);
-gl.uniform1f(renderZoomL, zoom);
-gl.uniform2fv(cameraL, camera);
 
 function onResize () {
   resolution = [ window.innerWidth, window.innerHeight ];
@@ -210,34 +303,10 @@ function affectColor (buf, i, c) {
   buf[i+3] = 255;
 }
 
-var perlin = generatePerlinNoise(worldSize[0], worldSize[1], 5, 0.1, 0.03);
-
 var data = new Uint8Array(4 * worldSize[0] * worldSize[1]);
-for(var i = 0; i < data.length; i += 4) {
-  var j = i / 4;
-  var r = perlin[j];
-  var x = j % worldSize[0];
-  var y = Math.floor(j / worldSize[0]);
-
-  if (r < 0.3 + 0.6 * step(20, 0, y) - step(worldSize[1]-60, worldSize[1], y) || r > 0.65 - 0.4 * step(30, 0, y) + 0.2 * step(worldSize[1]-30, worldSize[1], y) ) {
-    // Earth
-    affectColor(data, i, 1);
-    // Volcano
-    if (r < 0.3 * step(80, 0, y)) affectColor(data, i, 4);
-    // Source
-    if (r > 1.0 - 0.2 * step(worldSize[1] - 150, worldSize[1], y)) affectColor(data, i, 5);
-  }
-  /*
-
-  if (0.60 < r) affectColor(data, i, 1);
-  if (0.85 < r) affectColor(data, i, 5);
-  */
-}
-
 var logicTexture = gl.createTexture();
 gl.activeTexture(gl.TEXTURE0);
 gl.bindTexture(gl.TEXTURE_2D, logicTexture);
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, worldSize[0], worldSize[1], 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -252,6 +321,49 @@ gl.uniform2fv(logicSizeL, worldSize);
 gl.uniform3fv(logicColorsL, colors);
 
 var logicProgram = program;
+
+//////////// RUN THE GAME /////////////////
+
+var i;
+var perlin = generatePerlinNoise(worldSize[0], worldSize[1], 5, 0.1, 0.03);
+var lowestYs = [];
+for(i = 0; i < data.length; i += 4) {
+  var j = i / 4;
+  var r = perlin[j];
+  var x = j % worldSize[0];
+  var y = Math.floor(j / worldSize[0]);
+
+  if (r < 0.3 + 0.6 * step(20, 0, y) - step(worldSize[1]-60, worldSize[1], y) || r > 0.65 - 0.4 * step(30, 0, y) + 0.2 * step(worldSize[1]-30, worldSize[1], y) ) {
+    // Earth
+    affectColor(data, i, 1);
+    // Volcano
+    if (r < 0.25 * step(80, 0, y)) affectColor(data, i, 4);
+    // Source
+    if (r > 1.0 - 0.2 * step(worldSize[1] - 150, worldSize[1], y)) affectColor(data, i, 5);
+  }
+  else {
+    if (!lowestYs[x]) lowestYs[x] = y;
+  }
+  /*
+
+  if (0.60 < r) affectColor(data, i, 1);
+  if (0.85 < r) affectColor(data, i, 5);
+  */
+}
+
+for (i = 0; i<16; ++i) {
+  var x = 50 + i * 4;
+  var y = lowestYs[x];
+  var a = new Animal([ x, y ]);
+  a.v[0] = Math.random();
+  animals.push(a);
+}
+
+animals.push(new Animal([ 10, 50 ]));
+animals.push(new Animal([ 20, 100 ]));
+animals.push(new Animal([ 30, 150 ]));
+
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, worldSize[0], worldSize[1], 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
 
 var start = Date.now();
 var lastUpdate = 0;
@@ -274,6 +386,10 @@ function update () {
   gl.vertexAttribPointer(logicPositionL, 2, gl.FLOAT, gl.FALSE, 0, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, logicFramebuffer);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+  for (var i=0; i<animals.length; ++i) {
+    var animal = animals[i];
+    animalUpdate(animal);
+  }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
   tick ++;
@@ -281,15 +397,29 @@ function update () {
 
 (function render () {
   update();
+
+  var animalData = [];
+  for (var i=0; i<animals.length; ++i) {
+    var animal = animals[i];
+    animalData.push(animal.p[0]);
+    animalData.push(animal.p[1]);
+  }
+
   var time = (Date.now()-start)/1000;
   gl.useProgram(renderProgram);
   gl.uniform1f(renderTimeL, time);
+  gl.uniform1f(renderZoomL, zoom);
   gl.uniform2fv(cameraL, camera);
+  gl.uniform2fv(renderAnimalsL, animalData);
+  gl.uniform1i(renderAnimalsLengthL, animals.length);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   requestAnimationFrame(render);
 }());
+
+
+///////////// UTILITIES ////////////////////
 
 
 function generatePerlinNoise(width, height, octaveCount, amplitude, persistence) {

@@ -400,9 +400,7 @@
     precision highp float;
 
     #define OUTCOLOR vec4(0.0)
-
-    uniform float time;
-    uniform sampler2D state;
+    #define MAX_ANIMALS 20
 
     uniform vec2 worldSize;
     uniform vec2 resolution;
@@ -410,8 +408,26 @@
     uniform float zoom;
     uniform vec2 camera;
 
+    uniform float time;
+    uniform sampler2D state;
+    uniform vec2 animals[MAX_ANIMALS];
+    uniform int animalsLength;
+
     float rand(vec2 co){
       return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+    }
+
+    vec4 animal (vec2 p, vec2 pos, bool reversed) {
+      int x = int(p.x - pos.x), y = int(p.y - pos.y);
+      if (reversed) x = -x;
+      if (
+        ((x == -3 || x == -1) && (y == 4 || y == 5)) ||
+        (x == -2 && (0 <= y && y <= 3)) ||
+        (x == 1 && (0 <= y && y <= 2)) ||
+        ((-1 <= x && x <= 1) && y == 2)
+      )
+        return vec4(0.6, 0.4, 0.2, 1.0);
+      return vec4(0.0);
     }
     
     void main () {
@@ -425,14 +441,14 @@
 
       // Compute where the camera/zoom is in the state texture
       vec2 statePos = (gl_FragCoord.xy + disp + camera) / zoom;
+      vec2 statePosFloor = floor(statePos);
       vec2 stateBound = worldSize;
-      vec2 uv = (floor(statePos) + 0.5) / stateBound;
+      vec2 uv = (statePosFloor + 0.5) / stateBound;
       vec4 stateColor = uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0 ? OUTCOLOR : texture2D(state, uv);
-
 
       vec2 pixelPos = fract(statePos);
 
-      vec3 noiseColor = vec3(0.02) * vec3(
+      vec3 noiseColor = /* DISABLED for now */0.0 * vec3(0.02) * vec3(
         rand(zoom*floor(gl_FragCoord.xy/zoom)+time/31.0),
         rand(zoom*floor(gl_FragCoord.xy/zoom)+time/80.1),
         rand(zoom*floor(gl_FragCoord.xy/zoom)+time/13.2)
@@ -440,7 +456,17 @@
 
       vec3 pixelColor = -vec3(0.03) * (pixelPos.x - pixelPos.y);
 
-      gl_FragColor = vec4(noiseColor + pixelColor, 1.0) + stateColor;
+      vec4 worldColor = vec4(noiseColor + pixelColor, 1.0) + stateColor;
+
+      vec4 animalsColor = vec4(0.0);
+
+      for (int i=0; i<MAX_ANIMALS; ++i) { if (i >= animalsLength) break;
+        vec4 c = animal(statePosFloor, animals[i], mod(time + float(i)/9.0, 1.0) < 0.5);
+        if (c.a > 0.0)
+          animalsColor = c;
+      }
+      
+      gl_FragColor = mix(worldColor, animalsColor, min(1.0, animalsColor.a));
     }
   </script>
   <script src="seedrandom.min.js"></script>
