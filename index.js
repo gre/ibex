@@ -19,8 +19,8 @@ var colors = [
   0.60, 0.00, 0.00, // 4: volcano
   0.30, 0.60, 0.70, // 5: source of water
 
-  0.2, 0.25, 0.35,  // 6: air left
-  0.2, 0.3, 0.35  // 7: air right
+  0.18, 0.23, 0.30,  // 6: air left
+  0.04, 0.09, 0.16  // 7: air right
 ];
 
 var camAutoSpeed = 4;
@@ -205,7 +205,7 @@ function animalSyncSight (animal) {
 }
 
 function animalAI (animal) {
-  animal.v[0] = 0.3 * Math.random() - 0.1;
+  animal.v[0] = 0.3 * Math.random() - 0.14;
 }
 
 function ground (i) {
@@ -423,16 +423,12 @@ for(i = 0; i < data.length; i += 4) {
   */
 }
 
-for (i = 0; i<16; ++i) {
-  var x = 50 + i * 4;
-  var y = lowestYs[x];
+for (i = 0; i<20; ++i) {
+  var x = Math.floor(50 + i * (5+4*Math.random()) + 50 * Math.random());
+  var y = Math.floor(lowestYs[x] + 100 * Math.random());
   var a = new Animal([ x, y ]);
   animals.push(a);
 }
-
-animals.push(new Animal([ 10, 50 ]));
-animals.push(new Animal([ 20, 100 ]));
-animals.push(new Animal([ 30, 150 ]));
 
 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, worldSize[0], worldSize[1], 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
 
