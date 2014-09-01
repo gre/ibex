@@ -25,17 +25,17 @@ var updateRate = 35;
 var refreshWorldRate = 200;
 
 var uiElements = [0, 1, 4, 5];
-var uiButtonSize = 50;
+var uiButtonSize = 64;
 
 var colors = [
   0.11, 0.16, 0.23, // 0: nothing
   0.74, 0.66, 0.51, // 1: earth
   0.84, 0.17, 0.08, // 2: fire
-  0.40, 0.80, 0.95, // 3: water
+  0.40, 0.75, 0.90, // 3: water
 
   // spawners
   0.60, 0.00, 0.00, // 4: volcano
-  0.27, 0.63, 0.70, // 5: source of water
+  0.30, 0.60, 0.70, // 5: source of water
 
   0.2, 0.25, 0.35,  // 6: air left
   0.2, 0.3, 0.35  // 7: air right
@@ -148,6 +148,7 @@ function Animal (pos) {
   this.v = [0, 0];
   this.s = null;
   this.b = new Uint8Array(sightw * sighth);
+  this.t = 0; // next decision time
 }
 
 // Animal functions
@@ -167,7 +168,7 @@ function animalSyncSight (animal) {
 }
 
 function animalAI (animal) {
-  // TODO
+  animal.v[0] = 0.3 * Math.random() - 0.1;
 }
 
 function ground (i) {
@@ -177,47 +178,41 @@ function ground (i) {
 function animalUpdate (animal) {
   var i, y;
   animalSyncSight(animal);
-
-  animal.p[0] += animal.v[0];
-  animal.p[1] += animal.v[1];
+  var now = Date.now();
+  if (now > animal.t) {
+    animal.t = now + 500 + 500 * Math.random();
+    animalAI(animal);
+  }
 
   // Ground will push up
   y = 0;
   do {
     i = sightw * (sighthalfh + y) + sighthalfw;
     y ++;
-  } while (0 <= i && i < sightw * sighth && ground(animal.b[i]));
+  } while (y < sighthalfh && ground(animal.b[i]));
 
-  animalSyncSight(animal);
-  animal.p[1] += y;
-
-  y = 1;
-  do {
-    i = sightw * (sighthalfh + y) + sighthalfw;
-    y --;
-  } while (0 <= i && i < sightw * sighth && !ground(animal.b[i]));
-  y ++;
-
-  animal.p[1] += y;
-
-  /*
-  for (
-    i = sightw*(1+sighthalfh) + sighthalfw;
-    i > 0 && ground(animal.b[i]);
-    i -= sightw, animal.p[1] ++
-  ) {
+  var stuck = false; // FIXME
+  if (stuck) {
+    // Animal is stuck
   }
-  */
+  else {
+    animal.p[1] += y;
 
-  // Gravity
-  /*
-  for (
-    i = sightw*(-1+sighthalfh) + sighthalfw;
-    i < sightw * sighth && !ground(animal.b[i]);
-    i += sightw, animal.p[1] --
-  ) {
+    animalSyncSight(animal);
+
+    // Gravity
+    y = 1;
+    do {
+      i = sightw * (sighthalfh + y) + sighthalfw;
+      y --;
+    } while (0 <= i && i < sightw * sighth && !ground(animal.b[i]));
+    y ++;
+
+    animal.p[1] += y;
+
+    animal.p[0] += animal.v[0];
+    animal.p[1] += animal.v[1];
   }
-  */
 }
 
 //////////////////////////////////////
@@ -261,7 +256,8 @@ var renderTimeL = gl.getUniformLocation(program, "time");
 var renderZoomL = gl.getUniformLocation(program, "zoom");
 var renderStateL = gl.getUniformLocation(program, "state");
 var renderWorldSizeL = gl.getUniformLocation(program, "worldSize");
-var renderAnimalsL = gl.getUniformLocation(program, "animals");
+var renderAnimalsPL = gl.getUniformLocation(program, "animalsP");
+var renderAnimalsVL = gl.getUniformLocation(program, "animalsV");
 var renderAnimalsLengthL = gl.getUniformLocation(program, "animalsLength");
 var renderColorsL = gl.getUniformLocation(program, "colors");
 var renderUiElementsL = gl.getUniformLocation(program, "uiElements");
@@ -391,7 +387,6 @@ for (i = 0; i<16; ++i) {
   var x = 50 + i * 4;
   var y = lowestYs[x];
   var a = new Animal([ x, y ]);
-  a.v[0] = Math.random();
   animals.push(a);
 }
 
@@ -440,11 +435,14 @@ function update () {
     animalUpdate(animal);
   }
 
-  var animalData = [];
+  var animalPositions = [];
+  var animalVelocities = [];
   for (var i=0; i<animals.length; ++i) {
     var animal = animals[i];
-    animalData.push(animal.p[0]);
-    animalData.push(animal.p[1]);
+    animalPositions.push(animal.p[0]);
+    animalPositions.push(animal.p[1]);
+    animalVelocities.push(animal.v[0]);
+    animalVelocities.push(animal.v[1]);
   }
 
   var time = (Date.now()-start)/1000;
@@ -453,7 +451,8 @@ function update () {
   gl.uniform1f(renderZoomL, zoom);
   gl.uniform2fv(cameraL, camera);
   gl.uniform2fv(mouseL, mouse);
-  gl.uniform2fv(renderAnimalsL, animalData);
+  gl.uniform2fv(renderAnimalsPL, animalPositions);
+  gl.uniform2fv(renderAnimalsVL, animalVelocities);
   gl.uniform1i(renderAnimalsLengthL, animals.length);
   gl.uniform1i(renderDrawDragL, draggingElement);
   if (draggingElement) {

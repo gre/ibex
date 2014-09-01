@@ -39,6 +39,7 @@ Add limited resource
 ----
 How tu refuel?
 
+Alternatively: cool down
 
 Polish rules
 ---
