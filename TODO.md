@@ -39,3 +39,8 @@ Add limited resource
 ----
 How tu refuel?
 
+
+Polish rules
+---
+
+Water does not enough flow (maybe also enters too much in the ground).

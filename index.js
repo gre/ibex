@@ -3,20 +3,29 @@ Math.seedrandom(Math.floor(Date.now() / 60000));
 // Game states
 var tick = 0;
 var worldSize = [ 768, 256 ];
+var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
+var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
 var resolution;
 var zoom = 4;
 var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
+var mouse = [ 0, 0 ];
 
 var draw = 0;
+var draggingElement = 0;
 var drawPosition;
 var drawObject;
-var drawRadius;
+var drawRadius = 8;
 
 var animals = [];
 
 // Game constants
 
+// in milliseconds
 var updateRate = 35;
+var refreshWorldRate = 200;
+
+var uiElements = [0, 1, 4, 5];
+var uiButtonSize = 50;
 
 var colors = [
   0.11, 0.16, 0.23, // 0: nothing
@@ -37,47 +46,70 @@ var colors = [
 
 window.addEventListener("resize", onResize);
 
-var drag;
+var dragStart;
 var mousedownTime;
 var dragCam;
 
 function posToWorld (p) {
-  return [ (camera[0] + p[0]) / zoom, (camera[1] + resolution[1] - p[1]) / zoom ];
+  return [ (camera[0] + p[0]) / zoom, (camera[1] + p[1]) / zoom ];
+}
+function resetMouse (e) {
+  dragCam = null;
+  dragStart = null;
+  draggingElement = 0;
+  C.style.cursor = "default";
 }
 
-C.addEventListener("mouseleave", function (e) {
-  drag = null;
-});
+C.addEventListener("mouseleave", resetMouse);
 
 C.addEventListener("mousedown", function (e) {
   e.preventDefault();
-  drag = posE(e);
+  dragStart = posE(e);
   mousedownTime = Date.now();
-  dragCam = [].concat(camera);
+  var xElIndex = Math.floor(dragStart[0] / uiButtonSize);
+  if (dragStart[1] < uiButtonSize && xElIndex < uiElements.length) {
+    draggingElement = 1;
+    drawObject = uiElements[xElIndex];
+    C.style.cursor = "move";
+  }
+  else {
+    C.style.cursor = "move";
+    dragCam = [].concat(camera);
+  }
 });
 C.addEventListener("mouseup", function (e) {
-  var dx = camera[0] - dragCam[0];
-  var dy = camera[1] - dragCam[1];
-  var dragged = Date.now() - mousedownTime > 300 || dx*dx+dy*dy > 64;
-  if (!dragged) {
+  var p = posE(e);
+  if (draggingElement) {
     draw = 1;
-    drawPosition = posToWorld(posE(e));
-    drawRadius = 8;
+    drawPosition = posToWorld(p);
   }
-  drag = null;
+  resetMouse();
 });
 C.addEventListener("mousemove", function (e) {
-  if (drag) {
+  var p = posE(e);
+  mouse = p;
+  if (dragCam) {
     e.preventDefault();
-    var p = posE(e);
-    var dx = p[0] - drag[0];
-    var dy = -(p[1] - drag[1]);
+    var dx = p[0] - dragStart[0];
+    var dy = p[1] - dragStart[1];
     camera = [ dragCam[0] - dx, dragCam[1] - dy ];
+  }
+  else if (draggingElement) {
+
+  }
+  else {
+    var xElIndex = Math.floor(p[0] / uiButtonSize);
+    if (p[1] < uiButtonSize && xElIndex < uiElements.length) {
+      C.style.cursor = "pointer";
+    }
+    else {
+      C.style.cursor = "default";
+    }
   }
 });
 
 function posE (e) {
-  return [ e.clientX, e.clientY ];
+  return [ e.clientX, resolution[1] - e.clientY ];
 }
 
 document.addEventListener("keydown", function (e) {
@@ -94,9 +126,11 @@ document.addEventListener("keydown", function (e) {
   camera[0] += 8 * dx;
   camera[1] += 8 * dy;
 
+  /*
   if (e.keyCode == 86) drawObject = 4;
   if (e.keyCode == 78) drawObject = 0;
   if (e.keyCode == 83) drawObject = 5;
+  */
   
   if (dx || dy)
     e.preventDefault();
@@ -107,36 +141,29 @@ document.addEventListener("keydown", function (e) {
 
 var sightw = 32, sighth = 12;
 var sighthalfw = sightw / 2, sighthalfh = sighth / 2;
-var animalPixelBuf = new Uint8Array(sightw * sighth * 4);
 
 function Animal (pos) {
   // The buffer of the animal is its vision
   this.p = pos;
   this.v = [0, 0];
+  this.s = null;
   this.b = new Uint8Array(sightw * sighth);
-}
-
-function parseColors (bufin, bufout) {
-  // bufin: RGBA colors, bufout: element indexes
-  // bufin size == 4 * bufout size
-  for (var i=0; i<bufin.length; i += 4) {
-    for (var c=0; c<colors.length; c += 3) {
-      var diff = 0;
-      for (var j=0; j<3; ++j) {
-        var d = colors[c + j] - (bufin[i+j]/256);
-        diff += d * d;
-      }
-      if (diff < 0.001) break;
-    }
-    bufout[i/4] = c / 3;
-  }
 }
 
 // Animal functions
 // I'm not doing prototype to save bytes (better limit the usage of fields which are hard to minimize)
 
-function readAnimalSight (animal) {
-  parseColors(animalPixelBuf, animal.b);
+function animalSyncSight (animal) {
+  var sx = Math.floor(animal.p[0] - sighthalfw);
+  var sy = Math.floor(animal.p[1] - sighthalfh);
+  this.s = [sx,sy];
+  for (var x=0; x<sightw; ++x) {
+    for (var y=0; y<sighth; ++y) {
+      var wx = x + sx;
+      var wy = y + sy;
+      animal.b[x + y * sightw] = wx<0||wy<0||wx>=worldSize[0]||wy>=worldSize[1] ? 0 : worldPixelBuf[wx+wy*worldSize[0]];
+    }
+  }
 }
 
 function animalAI (animal) {
@@ -149,7 +176,7 @@ function ground (i) {
 
 function animalUpdate (animal) {
   var i, y;
-  readAnimalSight(animal);
+  animalSyncSight(animal);
 
   animal.p[0] += animal.v[0];
   animal.p[1] += animal.v[1];
@@ -161,7 +188,7 @@ function animalUpdate (animal) {
     y ++;
   } while (0 <= i && i < sightw * sighth && ground(animal.b[i]));
 
-  readAnimalSight(animal);
+  animalSyncSight(animal);
   animal.p[1] += y;
 
   y = 1;
@@ -236,11 +263,20 @@ var renderStateL = gl.getUniformLocation(program, "state");
 var renderWorldSizeL = gl.getUniformLocation(program, "worldSize");
 var renderAnimalsL = gl.getUniformLocation(program, "animals");
 var renderAnimalsLengthL = gl.getUniformLocation(program, "animalsLength");
+var renderColorsL = gl.getUniformLocation(program, "colors");
+var renderUiElementsL = gl.getUniformLocation(program, "uiElements");
+var renderDrawObjectL = gl.getUniformLocation(program, "drawObject");
+var renderDrawDragL = gl.getUniformLocation(program, "draggingElement");
+var renderDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
+
 var cameraL = gl.getUniformLocation(program, "camera");
+var mouseL = gl.getUniformLocation(program, "mouse");
 var resolutionL = gl.getUniformLocation(program, "resolution");
 
 gl.uniform1i(renderStateL, 0);
 gl.uniform2fv(renderWorldSizeL, worldSize);
+gl.uniform3fv(renderColorsL, colors);
+gl.uniform1iv(renderUiElementsL, uiElements);
 
 function onResize () {
   resolution = [ window.innerWidth, window.innerHeight ];
@@ -367,6 +403,7 @@ gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, worldSize[0], worldSize[1], 0, gl.RGBA,
 
 var start = Date.now();
 var lastUpdate = 0;
+var lastRefreshWorld = 0;
 function update () {
   var now = Date.now();
   if (now-lastUpdate < updateRate) return;
@@ -386,19 +423,22 @@ function update () {
   gl.vertexAttribPointer(logicPositionL, 2, gl.FLOAT, gl.FALSE, 0, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, logicFramebuffer);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-  //gl.readPixels(0, 0, worldSize[0], worldSize[0], gl.RGBA, gl.UNSIGNED_BYTE, worldBuf);
-  for (var i=0; i<animals.length; ++i) {
-    var animal = animals[i];
-    animalUpdate(animal);
+  if (now - lastRefreshWorld >= refreshWorldRate) {
+    lastRefreshWorld = now;
+    gl.readPixels(0, 0, worldSize[0], worldSize[1], gl.RGBA, gl.UNSIGNED_BYTE, worldPixelRawBuf);
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  parseColors(worldPixelRawBuf, worldPixelBuf);
 
   tick ++;
 }
 
 (function render () {
   update();
+  for (var i=0; i<animals.length; ++i) {
+    var animal = animals[i];
+    animalUpdate(animal);
+  }
 
   var animalData = [];
   for (var i=0; i<animals.length; ++i) {
@@ -412,8 +452,14 @@ function update () {
   gl.uniform1f(renderTimeL, time);
   gl.uniform1f(renderZoomL, zoom);
   gl.uniform2fv(cameraL, camera);
+  gl.uniform2fv(mouseL, mouse);
   gl.uniform2fv(renderAnimalsL, animalData);
   gl.uniform1i(renderAnimalsLengthL, animals.length);
+  gl.uniform1i(renderDrawDragL, draggingElement);
+  if (draggingElement) {
+    gl.uniform1f(renderDrawRadiusL, drawRadius);
+    gl.uniform1i(renderDrawObjectL, drawObject);
+  }
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -422,6 +468,22 @@ function update () {
 
 
 ///////////// UTILITIES ////////////////////
+
+function parseColors (bufin, bufout) {
+  // bufin: RGBA colors, bufout: element indexes
+  // bufin size == 4 * bufout size
+  for (var i=0; i<bufin.length; i += 4) {
+    for (var c=0; c<colors.length; c += 3) {
+      var diff = 0;
+      for (var j=0; j<3; ++j) {
+        var d = colors[c + j] - (bufin[i+j]/256);
+        diff += d * d;
+      }
+      if (diff < 0.001) break;
+    }
+    bufout[i/4] = c / 3;
+  }
+}
 
 
 function generatePerlinNoise(width, height, octaveCount, amplitude, persistence) {
