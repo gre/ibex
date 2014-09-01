@@ -24,9 +24,10 @@
     #define W 3
     #define V 4
     #define S 5
-    #define A 6
+    #define Al 6
+    #define Ar 7
     // wildcard
-    #define _ 7
+    #define _ 8
 
     /**
       * Game Rule Interactions.
@@ -44,7 +45,7 @@
  TODO     * Fire + Air => Fire decrease IF not surrounded by air OTHERWISE is increase (need oxygen)
       * Earth + Water => rarely creates Water Source (water infiltration)
       * Earth + Fire => rarely creates Volcano (fire melt ground into lava)
- TODO     * Earth + Air => sometimes Destroy (erosion), rarely creates Volcano (spark)
+ TODO     * Earth + Air => sometimes Destroy (erosion), rarely creates Fire (spark)
       *
       * Secondary elements: Source, Volcano
       * =========
@@ -98,17 +99,21 @@
 
 
     // Match with weights
-    float match (mat3 pattern, mat3 weights) {
+    float match (mat3 pattern, mat3 weights, ivec2 off) {
       float w = 0.0;
       for (int x=-1; x<=1; ++x) {
         for (int y=-1; y<=1; ++y) {
           int v = int(pattern[y+1][x+1]);
-          if (v == _ || v == get(x, y)) {
+          if (v == _ || v == get(x+off.x, y+off.y)) {
             w += weights[y+1][x+1];
           }
         }
       }
       return w;
+    }
+
+    float match (mat3 pattern, mat3 weights) {
+      return match(pattern, weights, ivec2(0));
     }
 
     // Match a pattern and return the nb of matches (ignoring the wildcards)
@@ -123,9 +128,13 @@
       return int(match(pattern, w));
     }
 
-    bool matchAll (mat3 pattern) {
+    bool matchAll (mat3 pattern, ivec2 off) {
       mat3 w = mat3(1.0,1.0,1.0, 1.0,1.0,1.0, 1.0,1.0,1.0);
-      return match(pattern, w) == 9.0;
+      return match(pattern, w, off) == 9.0;
+    }
+
+    bool matchAll (mat3 pattern) {
+      return matchAll(pattern, ivec2(0));
     }
 
     bool matchAny (mat3 pattern) {
@@ -190,7 +199,7 @@
        ), mat3(
          0.3, 0.9, 0.3,
          0.1, -0.6, 0.1,
-         0.0, -0.4, 0.0
+         0.0, -0.5, 0.0
        )), 0.9 - 0.6 * RAND, 1.4 + 0.3 * RAND)
        ||
        // Water Slide rules
@@ -383,13 +392,59 @@
             r = E;
           }
         }
-
       }
+
+      ////// AIR RULES //////
+      if (r == N) {
+        if (RAND < 0.00001) r = Al;
+        if (RAND < 0.00001) r = Ar;
+      }
+      bool aR = matchAll(mat3(
+        _, _, _,
+        Ar,_, _,
+        _, _, _
+      ));
+      bool aL = matchAll(mat3(
+        _, _, _,
+        _ ,_,Al,
+        _, _, _
+      ));
+      int airRes = aR && !aL ? Ar : aL && !aR ? Al : N;
+
+      if (aR || aL) {
+        if (prev==N) {
+          r = airRes;
+        }
+        if (r==F) {
+          r = RAND < 0.9 ? airRes : N;
+        }
+        if (r==W) {
+          r = RAND < 0.9 ? airRes : N;
+        }
+      }
+
+      if (prev == N || prev == Al || prev == Ar || prev == F || prev == W) {
+        if (matchAll(mat3(
+          W, _, _,
+          _, _, _,
+          F, _, _
+        ))) {
+          r = Ar;
+        }
+        if (matchAll(mat3(
+          _, _, W,
+          _, _, _,
+          _, _, F
+        ))) {
+          r = Al;
+        }
+      }
+
 
       }
       ///// Return the color result /////
 
-      vec3 c;AC(0)AC(1)AC(2)AC(3)AC(4)AC(5)AC(6)gl_FragColor=vec4(c,1.0); //: gl_FragColor=vec4(colors[r], 1.0);
+      vec3 c;AC(0)AC(1)AC(2)AC(3)AC(4)AC(5)AC(6)AC(7)gl_FragColor=vec4(c,1.0); //: gl_FragColor=vec4(colors[r], 1.0);
     }
   </script>
   

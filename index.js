@@ -19,7 +19,7 @@ var animals = [];
 var updateRate = 35;
 
 var colors = [
-  0.11, 0.16, 0.23, // 0: air
+  0.11, 0.16, 0.23, // 0: nothing
   0.74, 0.66, 0.51, // 1: earth
   0.84, 0.17, 0.08, // 2: fire
   0.40, 0.80, 0.95, // 3: water
@@ -28,7 +28,8 @@ var colors = [
   0.60, 0.00, 0.00, // 4: volcano
   0.27, 0.63, 0.70, // 5: source of water
 
-  0.66, 0.71, 0.71  // 6: air (aka wind)
+  0.2, 0.25, 0.35,  // 6: air left
+  0.2, 0.3, 0.35  // 7: air right
 ];
 
 
@@ -135,7 +136,6 @@ function parseColors (bufin, bufout) {
 // I'm not doing prototype to save bytes (better limit the usage of fields which are hard to minimize)
 
 function readAnimalSight (animal) {
-  gl.readPixels(animal.p[0] - sighthalfw, animal.p[1] - sighthalfh, sightw, sighth, gl.RGBA, gl.UNSIGNED_BYTE, animalPixelBuf);
   parseColors(animalPixelBuf, animal.b);
 }
 
@@ -151,8 +151,8 @@ function animalUpdate (animal) {
   var i, y;
   readAnimalSight(animal);
 
-    animal.p[0] += animal.v[0];
-    animal.p[1] += animal.v[1];
+  animal.p[0] += animal.v[0];
+  animal.p[1] += animal.v[1];
 
   // Ground will push up
   y = 0;
@@ -386,6 +386,8 @@ function update () {
   gl.vertexAttribPointer(logicPositionL, 2, gl.FLOAT, gl.FALSE, 0, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, logicFramebuffer);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  //gl.readPixels(0, 0, worldSize[0], worldSize[0], gl.RGBA, gl.UNSIGNED_BYTE, worldBuf);
   for (var i=0; i<animals.length; ++i) {
     var animal = animals[i];
     animalUpdate(animal);
