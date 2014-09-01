@@ -205,7 +205,7 @@
        // Water Slide rules
        (
         prev == N && (
-          RAND < 0.97 && (
+          RAND < 0.98 && (
           matchAll(mat3(
             W, _, _,
             _, _, _,
@@ -217,7 +217,7 @@
             _, _, E))
           )
           ||
-          RAND < 0.92 && (
+          RAND < 0.93 && (
           matchAll(mat3(
             _, _, _,
             W, _, _,
@@ -455,7 +455,6 @@
     #define AC(a) if(r==a)c=colors[a];
     #define RtoC AC(0)AC(1)AC(2)AC(3)AC(4)AC(5)AC(6)AC(7)
 
-    #define OUTCOLOR vec4(0.0)
     #define MAX_ANIMALS 20
     #define UI_SIZE 64.
     #define UI_LENGTH 4
@@ -535,7 +534,7 @@
       if (!draggingElement || dist > 1.0) return cin;
       int r = drawObject;
       vec3 c; RtoC
-      return cin + c - vec3(0.3);
+      return 1.1 * mix(cin, c, 0.6);
     }
 
     vec2 brushDispPass (float brushDist) {
@@ -559,7 +558,7 @@
       vec2 statePosFloor = floor(statePos);
       vec2 stateBound = worldSize;
       vec2 uv = (statePosFloor + 0.5) / stateBound;
-      vec4 stateColor = uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0 ? OUTCOLOR : texture2D(state, uv);
+      vec4 stateColor = uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0 ? vec4(statePos.y < 0.0 ? colors[1] : colors[0], 1.0) : texture2D(state, uv);
 
       vec2 pixelPos = fract(statePos);
 

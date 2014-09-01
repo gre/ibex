@@ -1,23 +1,5 @@
 Math.seedrandom(Math.floor(Date.now() / 60000));
 
-// Game states
-var tick = 0;
-var worldSize = [ 768, 256 ];
-var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
-var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
-var resolution;
-var zoom = 4;
-var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
-var mouse = [ 0, 0 ];
-
-var draw = 0;
-var draggingElement = 0;
-var drawPosition;
-var drawObject;
-var drawRadius = 8;
-
-var animals = [];
-
 // Game constants
 
 // in milliseconds
@@ -41,6 +23,27 @@ var colors = [
   0.2, 0.3, 0.35  // 7: air right
 ];
 
+var camAutoSpeed = 4;
+var camAutoThreshold = 160;
+
+// Game states
+var tick = 0;
+var worldSize = [ 768, 256 ];
+var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
+var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
+var resolution;
+var zoom = 4;
+var camera = [ 0, -uiButtonSize ]; // Camera is in resolution coordinate (not worldSize)
+var cameraV = [0, 0];
+var mouse = [ 0, 0 ];
+
+var draw = 0;
+var draggingElement = 0;
+var drawPosition;
+var drawObject;
+var drawRadius = 8;
+
+var animals = [];
 
 // Game events
 
@@ -49,15 +52,31 @@ window.addEventListener("resize", onResize);
 var dragStart;
 var mousedownTime;
 var dragCam;
+var isValidDrag;
+var autoScroll;
+
+function clamp (a, b, x) {
+  return Math.max(a, Math.min(x, b));
+}
 
 function posToWorld (p) {
   return [ (camera[0] + p[0]) / zoom, (camera[1] + p[1]) / zoom ];
 }
 function resetMouse (e) {
-  dragCam = null;
-  dragStart = null;
+  autoScroll = 0;
+  isValidDrag = 0;
+  dragCam = 0;
+  dragStart = 0;
   draggingElement = 0;
+  cameraV = [0,0];
   C.style.cursor = "default";
+}
+
+function setCam (c) {
+  camera = [
+    clamp(0, zoom * worldSize[0] - resolution[0], c[0]),
+    clamp(-uiButtonSize, 100+zoom * worldSize[1] - resolution[1], c[1])
+  ];
 }
 
 C.addEventListener("mouseleave", resetMouse);
@@ -79,7 +98,7 @@ C.addEventListener("mousedown", function (e) {
 });
 C.addEventListener("mouseup", function (e) {
   var p = posE(e);
-  if (draggingElement) {
+  if (isValidDrag && draggingElement) {
     draw = 1;
     drawPosition = posToWorld(p);
   }
@@ -88,22 +107,40 @@ C.addEventListener("mouseup", function (e) {
 C.addEventListener("mousemove", function (e) {
   var p = posE(e);
   mouse = p;
-  if (dragCam) {
-    e.preventDefault();
-    var dx = p[0] - dragStart[0];
-    var dy = p[1] - dragStart[1];
-    camera = [ dragCam[0] - dx, dragCam[1] - dy ];
-  }
-  else if (draggingElement) {
-
-  }
-  else {
+  if (!dragCam && !draggingElement) {
     var xElIndex = Math.floor(p[0] / uiButtonSize);
     if (p[1] < uiButtonSize && xElIndex < uiElements.length) {
       C.style.cursor = "pointer";
     }
     else {
       C.style.cursor = "default";
+    }
+  }
+  else {
+    e.preventDefault();
+    var dx = p[0] - dragStart[0];
+    var dy = p[1] - dragStart[1];
+    if (dragCam) {
+      setCam([ dragCam[0] - dx, dragCam[1] - dy ]);
+    }
+    if (draggingElement) {
+      isValidDrag = isValidDrag || p[1] > uiButtonSize;
+      autoScroll = autoScroll || p[1] > camAutoThreshold;
+      if (autoScroll) {
+        cameraV=[0,0];
+        if (p[0] > resolution[0]-camAutoThreshold) {
+          cameraV[0] = camAutoSpeed;
+        }
+        if (p[0] < camAutoThreshold) {
+          cameraV[0] = -camAutoSpeed;
+        }
+        if (p[1] > resolution[1]-camAutoThreshold) {
+          cameraV[1] = camAutoSpeed;
+        }
+        if (p[1] < camAutoThreshold) {
+          cameraV[1] = -camAutoSpeed;
+        }
+      }
     }
   }
 });
@@ -146,7 +183,7 @@ function Animal (pos) {
   // The buffer of the animal is its vision
   this.p = pos;
   this.v = [0, 0];
-  this.s = null;
+  this.s = 0;
   this.b = new Uint8Array(sightw * sighth);
   this.t = 0; // next decision time
 }
@@ -275,7 +312,10 @@ gl.uniform3fv(renderColorsL, colors);
 gl.uniform1iv(renderUiElementsL, uiElements);
 
 function onResize () {
-  resolution = [ window.innerWidth, window.innerHeight ];
+  resolution = [
+    Math.max(600, window.innerWidth),
+    Math.max(400, window.innerHeight)
+  ];
   C.width = resolution[0];
   C.height = resolution[1];
   gl.viewport(0, 0, C.width, C.height);
@@ -434,6 +474,8 @@ function update () {
     var animal = animals[i];
     animalUpdate(animal);
   }
+
+  setCam([ camera[0]+cameraV[0], camera[1]+cameraV[1] ]);
 
   var animalPositions = [];
   var animalVelocities = [];
