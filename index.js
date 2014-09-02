@@ -405,7 +405,7 @@ for(i = 0; i < data.length; i += 4) {
   var x = j % worldSize[0];
   var y = Math.floor(j / worldSize[0]);
 
-  if (r < 0.3 + 0.6 * step(20, 0, y) - step(worldSize[1]-60, worldSize[1], y) || r > 0.65 - 0.4 * step(30, 0, y) + 0.2 * step(worldSize[1]-30, worldSize[1], y) ) {
+  if (r < 0.25 + 0.6 * step(20, 0, y) - step(worldSize[1]-60, worldSize[1], y) || r > 0.7 - 0.4 * step(30, 0, y) + 0.2 * step(worldSize[1]-30, worldSize[1], y) ) {
     // Earth
     affectColor(data, i, 1);
     // Volcano

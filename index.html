@@ -140,7 +140,7 @@
     bool matchAny (mat3 pattern) {
       return match(pattern) > 1;
     }
-    bool matchOne (mat3 pattern) {
+    bool matchOne (mat3 pattern) { // FIXME replace with "matchLeft, matchRight, matchTop, matchBottom" ?
       return matchAny(pattern);
     }
 
@@ -399,44 +399,33 @@
         if (RAND < 0.00001) r = Al;
         if (RAND < 0.00001) r = Ar;
       }
-      bool aR = matchAll(mat3(
-        _, _, _,
-        Ar,_, _,
-        _, _, _
-      ));
-      bool aL = matchAll(mat3(
-        _, _, _,
-        _ ,_,Al,
-        _, _, _
-      ));
-      int airRes = aR && !aL ? Ar : aL && !aR ? Al : N;
 
-      if (aR || aL) {
-        if (prev==N) {
-          r = airRes;
-        }
-        if (r==F) {
-          r = RAND < 0.9 ? airRes : N;
-        }
-        if (r==W) {
-          r = RAND < 0.9 ? airRes : N;
-        }
+      int wind = r==Al ? Al : r == Ar ? Ar : 0;
+      float f = match(mat3(
+        Ar, _, Al,
+        Ar, _, Al,
+        Ar, _, Al
+        ), mat3(
+        -0.1+0.05*(RAND-0.5), 0.0, 0.1,
+        -0.7, 0.0, 0.7,
+        -0.2, 0.0, 0.2+0.05*(RAND-0.5)
+      ));
+      if (between(f, 0.4 * RAND, 1.0)) {
+        wind = Al;
+      }
+      else if (between(f, -1.0, -0.4 * RAND)) {
+        wind = Ar;
       }
 
-      if (prev == N || prev == Al || prev == Ar || prev == F || prev == W) {
-        if (matchAll(mat3(
-          W, _, _,
-          _, _, _,
-          F, _, _
-        ))) {
-          r = Ar;
+      if (wind != 0) {
+        if (r == N) {
+          r = wind;
         }
-        if (matchAll(mat3(
-          _, _, W,
-          _, _, _,
-          _, _, F
-        ))) {
-          r = Al;
+        else if(r == F) {
+          if (RAND < 0.4) r = wind;
+        }
+        else if (r == W) {
+          if (RAND < 0.1) r = wind;
         }
       }
 
