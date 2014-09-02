@@ -15,6 +15,7 @@
   </script>
   <script id="fragmentLogic" type="x-shader/x-fragment">
     #define AC(a) if(r==a)c=colors[a];
+    #define RtoC AC(0)AC(1)AC(2)AC(3)AC(4)AC(5)AC(6)AC(7)AC(8)
     #define RAND (seed=vec2(rand(seed), rand(seed+9.))).x
 
     // Elements
@@ -26,8 +27,9 @@
     #define S 5
     #define Al 6
     #define Ar 7
+    #define G 8
     // wildcard
-    #define _ 8
+    #define _ 9
 
     /**
       * Game Rule Interactions.
@@ -79,7 +81,7 @@
     uniform vec3 colors[_];
 
     vec4 getColor(ivec2 position) {
-      vec2 uv = (gl_FragCoord.xy + vec2(position)*vec2(1.0, -1.0)/* quick fix for the currently reversed Y ...*/) / size;
+      vec2 uv = (gl_FragCoord.xy + vec2(position)) / size;
       if (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0)
         return vec4(colors[0], 0.0);
       return texture2D(state, uv);
@@ -103,9 +105,9 @@
       float w = 0.0;
       for (int x=-1; x<=1; ++x) {
         for (int y=-1; y<=1; ++y) {
-          int v = int(pattern[y+1][x+1]);
+          int v = int(pattern[-y+1][x+1]);
           if (v == _ || v == get(x+off.x, y+off.y)) {
-            w += weights[y+1][x+1];
+            w += weights[-y+1][x+1];
           }
         }
       }
@@ -144,6 +146,13 @@
       return matchAny(pattern);
     }
 
+    bool matchAnyAdjacent (int e) {
+      return matchAny(mat3(
+        e, e, e,
+        e, _, e,
+        e, e, e));
+    }
+
     bool between (float f, float a, float b) {
       return a <= f && f <= b;
     }
@@ -152,22 +161,46 @@
       return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
     }
 
+    float grassDistrib (vec2 p) {
+      return mix(rand(vec2(p.x)), 0.5*(1.0+(cos(sin(p.y*0.01 + p.x * 0.05) + (1.0 + 0.3*sin(p.x*0.01)) * p.y * 0.08))), 0.2);
+    }
+
     void main () {
       
       int prev = get(0, 0);
+      int down = get(0, -1);
 
       vec2 seed = gl_FragCoord.xy + 0.001 * tick;
+
+      bool prevIsSolid = prev==E||prev==G||prev==V||prev==S;
 
       int r = N;
 
       if (draw) {
         vec2 pos = floor(gl_FragCoord.xy);
+        int drawing = prev;
         if (distance(pos, vec2(drawPosition)) <= drawRadius) {
-          r = drawObject;
+          if (drawObject == W) {
+            if (prevIsSolid) {
+              drawing = S;
+            }
+            else if (prev==N && mod(pos.x + pos.y, 2.0)==0.0) {
+              drawing = W;
+            }
+          }
+          else if (drawObject == F) {
+            if (prevIsSolid) {
+              drawing = V;
+            }
+            else {
+              drawing = F;
+            }
+          }
+          else {
+            drawing = drawObject;
+          }
         }
-        else {
-          r = prev;
-        }
+        r = drawing;
       }
       else {
 
@@ -188,6 +221,11 @@
         r = F;
       }
 
+      // When fire met grass, fire can stay to continue to consume it
+      if (prev == F && RAND < 0.3 && matchAnyAdjacent(G)) {
+        r = F;
+      }
+
       ////// WATER RULES ///////
 
       if (
@@ -198,11 +236,11 @@
          _, F, _
        ), mat3(
          0.3, 0.9, 0.3,
-         0.1, -0.6, 0.1,
-         0.0, -0.5, 0.0
+         0.1, -0.45, 0.1,
+         0.0, -0.35, 0.0
        )), 0.9 - 0.6 * RAND, 1.4 + 0.3 * RAND)
        ||
-       // Water Slide rules
+       // Water flow rules
        (
         prev == N && (
           RAND < 0.98 && (
@@ -284,6 +322,50 @@
         }
       }
 
+      ////// Grass RULES ////
+      int grassMaxHeight = int(14.0 * pow(grassDistrib(gl_FragCoord.xy), 1.3));
+      if (grassMaxHeight > 0) {
+        if (prev == G) {
+          r = G;
+          if (RAND < 0.95 && (
+            matchAny(mat3(
+              F, F, F,
+              F, _, F,
+              F, F, F
+            ))
+            ||
+            matchAny(mat3(
+              V, V, V,
+              V, _, V,
+              V, V, V
+            ))
+          )) {
+            r = F;
+          }
+        }
+        else if (prev == N && (matchAnyAdjacent(E) || matchAnyAdjacent(G) || matchAnyAdjacent(S))) {
+          if (RAND < 0.03 &&
+            get(0, -grassMaxHeight) != G && (
+            down==G && RAND < 0.2 || // The grass sometimes grow
+            down==E && RAND < 0.1 || // The grass rarely spawn by itself
+            matchAny(mat3(
+              W, W, W,
+              W, _, W,
+              W, W, W
+            ))
+            ||
+            matchAny(mat3(
+              S, S, S,
+              S, _, S,
+              S, S, S
+            ))
+          )) {
+            r = G;
+          }
+        }
+      }
+
+
       ////// VOLCANO RULES /////
       
       // Volcano creates fire
@@ -355,7 +437,7 @@
         r = S;
 
         // Dry: Source -> Earth
-        if (RAND<0.06 && !matchAny(mat3(
+        if (RAND<0.05 && !matchAny(mat3(
           W, W, W,
           _, _, _,
           _, _, _
@@ -401,19 +483,20 @@
       }
 
       int wind = r==Al ? Al : r == Ar ? Ar : 0;
+      float maxWind = 0.95;
       float f = match(mat3(
         Ar, _, Al,
         Ar, _, Al,
         Ar, _, Al
         ), mat3(
         -0.1+0.05*(RAND-0.5), 0.0, 0.1,
-        -0.7, 0.0, 0.7,
+        -0.65, 0.0, 0.65,
         -0.2, 0.0, 0.2+0.05*(RAND-0.5)
       ));
-      if (between(f, 0.4 * RAND, 1.0)) {
+      if (between(f, 0.4 * RAND, maxWind)) {
         wind = Al;
       }
-      else if (between(f, -1.0, -0.4 * RAND)) {
+      else if (between(f, -maxWind, -0.4 * RAND)) {
         wind = Ar;
       }
 
@@ -433,7 +516,10 @@
       }
       ///// Return the color result /////
 
-      vec3 c;AC(0)AC(1)AC(2)AC(3)AC(4)AC(5)AC(6)AC(7)gl_FragColor=vec4(c,1.0); //: gl_FragColor=vec4(colors[r], 1.0);
+      // r = int(grassDistrib(gl_FragCoord.xy) * 3.0); // for TEST
+
+      vec3 c;RtoC
+      gl_FragColor=vec4(c,1.0); //: gl_FragColor=vec4(colors[r], 1.0);
     }
   </script>
   
@@ -442,7 +528,7 @@
   </script>
   <script id="fragmentRender" type="x-shader/x-fragment">
     #define AC(a) if(r==a)c=colors[a];
-    #define RtoC AC(0)AC(1)AC(2)AC(3)AC(4)AC(5)AC(6)AC(7)
+    #define RtoC AC(0)AC(1)AC(2)AC(3)AC(4)AC(5)AC(6)AC(7)AC(8)
 
     #define MAX_ANIMALS 20
     #define UI_SIZE 64.
@@ -456,7 +542,8 @@
     #define S 5
     #define Al 6
     #define Ar 7
-    #define _ 8
+    #define G 8
+    #define _ 9
   
     precision highp float;
 
@@ -536,6 +623,13 @@
         sin(dispBrushSpeed*time+dispBrushAmp*gl_FragCoord.y+0.1)
       );
     }
+
+    vec4 stateColorPass (vec4 c, vec2 pos) {
+      if (distance(c.rgb, colors[G]) < 0.01) {
+        return c * mix(1.0, rand(pos), 0.2);
+      }
+      return c;
+    }
     
     void main () {
       float brushSize = 8.0;
@@ -547,30 +641,35 @@
       vec2 statePosFloor = floor(statePos);
       vec2 stateBound = worldSize;
       vec2 uv = (statePosFloor + 0.5) / stateBound;
-      vec4 stateColor = uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0 ? vec4(statePos.y < 0.0 ? colors[1] : colors[0], 1.0) : texture2D(state, uv);
+      bool outOfBound = uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0;
+      vec4 stateColor = outOfBound ? vec4(statePos.y < 0.0 ? colors[1] : colors[0], 1.0) : stateColorPass(texture2D(state, uv), statePosFloor);
 
       vec2 pixelPos = fract(statePos);
 
-      vec3 noiseColor = /* DISABLED for now */0.0 * vec3(0.02) * vec3(
+      vec3 c = stateColor.rgb;
+
+      vec3 noiseColor = vec3(0.02) * vec3(
         rand(zoom*floor(gl_FragCoord.xy/zoom)+time/31.0),
         rand(zoom*floor(gl_FragCoord.xy/zoom)+time/80.1),
         rand(zoom*floor(gl_FragCoord.xy/zoom)+time/13.2)
       );
-
       vec3 pixelColor = -vec3(0.03) * (pixelPos.x - pixelPos.y);
 
-      vec4 worldColor = vec4(noiseColor + pixelColor, 1.0) + stateColor;
+      // Bottleneck...
 
-      vec4 animalsColor = vec4(0.0);
-
-      for (int i=0; i<MAX_ANIMALS; ++i) { if (i >= animalsLength) break;
-        vec4 c = animal(statePosFloor, animalsP[i], animalsV[i]);
-        if (c.a > 0.0)
-          animalsColor = c;
+      if (!outOfBound) {
+        vec4 animalsColor = vec4(0.0);
+        for (int i=0; i<MAX_ANIMALS; ++i) { if (i >= animalsLength) break;
+          vec4 c = animal(statePosFloor, animalsP[i], animalsV[i]);
+          if (c.a > 0.0) {
+            animalsColor = c;
+            break;
+          }
+        }
+        vec3 worldColor = c + noiseColor + pixelColor;
+        c = animalsColor.a==0.0 ? worldColor : mix(worldColor, animalsColor.rgb, min(1.0, animalsColor.a));
+        c = brushColorPass(c, distance(statePosFloor, floor((mouse + camera)/zoom)) / brushSize);
       }
-      
-      vec3 c = mix(worldColor, animalsColor, min(1.0, animalsColor.a)).rgb;
-      c = brushColorPass(c, distance(statePosFloor, floor((mouse + camera)/zoom)) / brushSize);
       vec4 ui = UI();
       c = mix(c.rgb, ui.rgb, ui.a);
       gl_FragColor = vec4(c, 1.0);

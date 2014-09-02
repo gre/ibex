@@ -6,7 +6,7 @@ Math.seedrandom(Math.floor(Date.now() / 60000));
 var updateRate = 35;
 var refreshWorldRate = 200;
 
-var uiElements = [0, 1, 4, 5];
+var uiElements = [0, 1, 2, 3];
 var uiButtonSize = 64;
 
 var colors = [
@@ -19,8 +19,9 @@ var colors = [
   0.60, 0.00, 0.00, // 4: volcano
   0.30, 0.60, 0.70, // 5: source of water
 
-  0.18, 0.23, 0.30,  // 6: air left
-  0.04, 0.09, 0.16  // 7: air right
+  0.15, 0.20, 0.27,  // 6: air left
+  0.07, 0.12, 0.19,  // 7: air right
+  0.20, 0.60, 0.20   // 8: grass (forest)
 ];
 
 var camAutoSpeed = 4;
@@ -28,7 +29,7 @@ var camAutoThreshold = 160;
 
 // Game states
 var tick = 0;
-var worldSize = [ 768, 256 ];
+var worldSize = [ 512, 256 ];
 var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
 var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
 var resolution;
@@ -75,7 +76,7 @@ function resetMouse (e) {
 function setCam (c) {
   camera = [
     clamp(0, zoom * worldSize[0] - resolution[0], c[0]),
-    clamp(-uiButtonSize, 100+zoom * worldSize[1] - resolution[1], c[1])
+    clamp(-uiButtonSize, 50+zoom * worldSize[1] - resolution[1], c[1])
   ];
 }
 
@@ -399,29 +400,34 @@ var logicProgram = program;
 var i;
 var perlin = generatePerlinNoise(worldSize[0], worldSize[1], 5, 0.1, 0.03);
 var lowestYs = [];
-for(i = 0; i < data.length; i += 4) {
+for(i = 0; i < data.length; i += 4) affectColor(data, i, (function (i) {
   var j = i / 4;
   var r = perlin[j];
   var x = j % worldSize[0];
   var y = Math.floor(j / worldSize[0]);
 
   if (r < 0.25 + 0.6 * step(20, 0, y) - step(worldSize[1]-60, worldSize[1], y) || r > 0.7 - 0.4 * step(30, 0, y) + 0.2 * step(worldSize[1]-30, worldSize[1], y) ) {
-    // Earth
-    affectColor(data, i, 1);
     // Volcano
-    if (r < 0.25 * step(80, 0, y)) affectColor(data, i, 4);
+    if (r < 0.25 * step(80, 0, y))
+      return 4;
     // Source
-    if (r > 1.0 - 0.2 * step(worldSize[1] - 150, worldSize[1], y)) affectColor(data, i, 5);
+    if (r > 1.0 - 0.2 * step(worldSize[1] - 150, worldSize[1], y))
+      return 5;
+    // Earth
+    return 1;
   }
   else {
     if (!lowestYs[x]) lowestYs[x] = y;
   }
+
+  return 0;
+
   /*
 
   if (0.60 < r) affectColor(data, i, 1);
   if (0.85 < r) affectColor(data, i, 5);
   */
-}
+  }(i)));
 
 for (i = 0; i<20; ++i) {
   var x = Math.floor(50 + i * (5+4*Math.random()) + 50 * Math.random());
