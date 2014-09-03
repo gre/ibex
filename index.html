@@ -6,7 +6,8 @@
   <link rel="stylesheet" href="index.css">
 </head>
 <body>
-  <canvas id="C"></canvas>
+  Loading...
+  
   <script id="vertexLogic" type="x-shader/x-vertex">
     attribute vec2 position;
     void main() {
@@ -16,10 +17,10 @@
   <script id="fragmentLogic" type="x-shader/x-fragment">
     #define AC(a) if(r==a)c=colors[a];
     #define RtoC AC(0)AC(1)AC(2)AC(3)AC(4)AC(5)AC(6)AC(7)AC(8)
-    #define RAND (seed=vec2(rand(seed), rand(seed+9.))).x
+    #define RAND (s=vec2(rand(s), rand(s+9.))).x
 
     // Elements
-    #define N 0
+    #define A 0
     #define E 1
     #define F 2
     #define W 3
@@ -70,6 +71,7 @@
   
     precision highp float;
     uniform vec2 size;
+    uniform float seed;
     uniform float tick;
     uniform sampler2D state;
 
@@ -162,19 +164,21 @@
     }
 
     float grassDistrib (vec2 p) {
-      return mix(rand(vec2(p.x)), 0.5*(1.0+(cos(sin(p.y*0.01 + p.x * 0.05) + (1.0 + 0.3*sin(p.x*0.01)) * p.y * 0.08))), 0.2);
+      return mix(rand(vec2(p.x)), 0.5*(1.0+(cos(sin(p.y*0.01 + p.x * 0.05) + (1.0 + 0.3*sin(p.x*0.01)) * p.y * 0.08))), 0.5);
     }
 
     void main () {
+      float x = gl_FragCoord.x;
+      float y = gl_FragCoord.y;
       
       int prev = get(0, 0);
       int down = get(0, -1);
 
-      vec2 seed = gl_FragCoord.xy + 0.001 * tick;
+      vec2 s = gl_FragCoord.xy + 0.001 * tick;
 
       bool prevIsSolid = prev==E||prev==G||prev==V||prev==S;
 
-      int r = N;
+      int r = A;
 
       if (draw) {
         vec2 pos = floor(gl_FragCoord.xy);
@@ -184,7 +188,7 @@
             if (prevIsSolid) {
               drawing = S;
             }
-            else if (prev==N && mod(pos.x + pos.y, 2.0)==0.0) {
+            else if (!prevIsSolid && mod(pos.x + pos.y, 2.0)==0.0) {
               drawing = W;
             }
           }
@@ -221,8 +225,8 @@
         r = F;
       }
 
-      // When fire met grass, fire can stay to continue to consume it
-      if (prev == F && RAND < 0.3 && matchAnyAdjacent(G)) {
+      // Fire propagation: When fire met grass, fire can stay to continue to consume it
+      if (prev == F && RAND < 0.6 && matchAnyAdjacent(G)) {
         r = F;
       }
 
@@ -242,7 +246,7 @@
        ||
        // Water flow rules
        (
-        prev == N && (
+        !prevIsSolid && (
           RAND < 0.98 && (
           matchAll(mat3(
             W, _, _,
@@ -267,6 +271,17 @@
             _, _, E))
           )))) {
         r = W;
+      }
+
+      // Occasional rain
+      float rainRelativeTime = mod(tick, 300.0);
+      if (!prevIsSolid &&
+          y >= size[1]-1.0 &&
+          rainRelativeTime < 100.0) {
+        float rainLgth = 100.0 * rand(vec2(seed + tick - rainRelativeTime));
+        float rainStart = rand(vec2(seed*0.7 + tick - rainRelativeTime)) * (size[0]-rainLgth);
+        if (rainStart < x && x < rainStart+rainLgth)
+          r = W;
       }
 
       ////// EARTH RULES ////
@@ -323,7 +338,7 @@
       }
 
       ////// Grass RULES ////
-      int grassMaxHeight = int(14.0 * pow(grassDistrib(gl_FragCoord.xy), 1.3));
+      int grassMaxHeight = int(20.0 * pow(grassDistrib(gl_FragCoord.xy), 1.4));
       if (grassMaxHeight > 0) {
         if (prev == G) {
           r = G;
@@ -343,11 +358,11 @@
             r = F;
           }
         }
-        else if (prev == N && (matchAnyAdjacent(E) || matchAnyAdjacent(G) || matchAnyAdjacent(S))) {
-          if (RAND < 0.03 &&
+        else if (!prevIsSolid && (matchAnyAdjacent(E) || matchAnyAdjacent(G) || matchAnyAdjacent(S))) {
+          if (RAND < 0.014 &&
             get(0, -grassMaxHeight) != G && (
-            down==G && RAND < 0.2 || // The grass sometimes grow
-            down==E && RAND < 0.1 || // The grass rarely spawn by itself
+            down==G && RAND < 0.14 || // The grass sometimes grow
+            down==E && RAND < 0.05 || // The grass rarely spawn by itself
             matchAny(mat3(
               W, W, W,
               W, _, W,
@@ -369,7 +384,7 @@
       ////// VOLCANO RULES /////
       
       // Volcano creates fire
-      if ((prev==N || prev==F) && matchAll(mat3(
+      if ((!prevIsSolid || prev==F) && matchAll(mat3(
           _, _, _,
           _, _, _,
           _, V, _))) {
@@ -420,9 +435,21 @@
         
       }
 
+      // Occasional volcano
+      float volcRelativeTime = mod(tick, 25.0);
+      if (prevIsSolid &&
+          y <= 1.0 &&
+          RAND < 0.3 &&
+          volcRelativeTime <= 1.0) {
+        float volcLgth = 10.0 * rand(vec2(seed*0.07 + tick - volcRelativeTime));
+        float volcStart = rand(vec2(seed*0.01 + tick - volcRelativeTime)) * (size[0]-volcLgth);
+        if (volcStart < x && x < volcStart+volcLgth)
+          r = V;
+      }
+
       ////// SOURCE RULES /////
 
-      if ((prev==N || prev==W) && match(mat3(
+      if ((!prevIsSolid || prev==W) && match(mat3(
           S, S, S,
           S, _, S,
           _, _, _), mat3(
@@ -437,7 +464,7 @@
         r = S;
 
         // Dry: Source -> Earth
-        if (RAND<0.05 && !matchAny(mat3(
+        if (RAND<0.06 && !matchAny(mat3(
           W, W, W,
           _, _, _,
           _, _, _
@@ -477,9 +504,25 @@
       }
 
       ////// AIR RULES //////
-      if (r == N) {
+      if (r == A) {
         if (RAND < 0.00001) r = Al;
         if (RAND < 0.00001) r = Ar;
+      }
+
+      if (!prevIsSolid && RAND < 0.6 && (
+        matchAll(mat3(
+          _, _, W,
+          _, _, Al,
+          _, _, _
+        ))
+        ||
+        matchAll(mat3(
+          W, _, _,
+          Ar,_, _,
+          _, _, _
+        ))
+      )) {
+        r = W;
       }
 
       int wind = r==Al ? Al : r == Ar ? Ar : 0;
@@ -501,7 +544,7 @@
       }
 
       if (wind != 0) {
-        if (r == N) {
+        if (r == A) {
           r = wind;
         }
         else if(r == F) {
@@ -572,16 +615,55 @@
       return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
     }
 
-    vec4 animal (vec2 p, vec2 pos, vec2 vel) {
-      int x = int(p.x - pos.x), y = int(p.y - pos.y);
+    vec4 animal (vec2 p, vec2 pos, vec2 vel, float size) {
+      // TODO: more sprites. handle cliff? walk? 
+      int x = int(floor(p.x - pos.x)), y = int(floor(p.y - pos.y));
       if (vel.x > 0.0) x = -x;
       if (
-        ((x == -3 || x == -1) && (y == 4 || y == 5)) ||
-        (x == -2 && (0 <= y && y <= 3)) ||
-        (x == 1 && (0 <= y && y <= 2)) ||
-        ((-1 <= x && x <= 1) && y == 2)
+        ((x == -1 || x == 1) && (y == 4 || y == 5)) ||
+        (x == 0 && (0 <= y && y <= 3)) ||
+        (x == 3 && (0 <= y && y <= 2)) ||
+        ((1 <= x && x <= 3) && y == 2)
       )
         return vec4(0.6, 0.4, 0.2, 1.0);
+      return vec4(0.0);
+    }
+
+    vec2 brushDispPass (float brushDist) {
+      if (!draggingElement) return vec2(0.0);
+      float dispBrush = 4.0;
+      float dispBrushAmp = 0.1;
+      float dispBrushSpeed = 4.0;
+      return dispBrush * brushDist * vec2(
+        cos(dispBrushSpeed*1.1*time+dispBrushAmp*0.9*gl_FragCoord.x+0.5),
+        sin(dispBrushSpeed*time+dispBrushAmp*gl_FragCoord.y+0.1)
+      );
+    }
+
+    vec4 UI2 (vec3 cin) {
+      // TODO
+      /*
+      bool visible = true;
+      float minDist = 6.0;
+      float maxDist = 32.0;
+      vec2 d = mouse - gl_FragCoord.xy;
+      float l = length(d);
+      float brushDist = pow(smoothstep(maxDist, 0.0, l), 0.5);
+      if (visible && minDist <= l && l <= maxDist && abs(d.x) > minDist && abs(d.y) > minDist) {
+        if (d.x < 0.0 && d.y < 0.0) {
+          return 1.1 * vec4(mix(cin, colors[0], 0.6), 1.0);
+        }
+        else if (d.x > 0.0 && d.y < 0.0) {
+          return 1.1 * vec4(mix(cin, colors[1], 0.6), 1.0);
+        }
+        else if (d.x < 0.0 && d.y > 0.0) {
+          return 1.1 * vec4(mix(cin, colors[2], 0.6), 1.0);
+        }
+        else {
+          return 1.1 * vec4(mix(cin, colors[3], 0.6), 1.0);
+        }
+      }
+      */
       return vec4(0.0);
     }
 
@@ -610,18 +692,8 @@
       if (!draggingElement || dist > 1.0) return cin;
       int r = drawObject;
       vec3 c; RtoC
+        // RtoC can go away!!!!
       return 1.1 * mix(cin, c, 0.6);
-    }
-
-    vec2 brushDispPass (float brushDist) {
-      if (!draggingElement) return vec2(0.0);
-      float dispBrush = 4.0;
-      float dispBrushAmp = 0.1;
-      float dispBrushSpeed = 4.0;
-      return dispBrush * brushDist * vec2(
-        cos(dispBrushSpeed*1.1*time+dispBrushAmp*0.9*gl_FragCoord.x+0.5),
-        sin(dispBrushSpeed*time+dispBrushAmp*gl_FragCoord.y+0.1)
-      );
     }
 
     vec4 stateColorPass (vec4 c, vec2 pos) {
@@ -660,7 +732,7 @@
       if (!outOfBound) {
         vec4 animalsColor = vec4(0.0);
         for (int i=0; i<MAX_ANIMALS; ++i) { if (i >= animalsLength) break;
-          vec4 c = animal(statePosFloor, animalsP[i], animalsV[i]);
+          vec4 c = animal(statePos, animalsP[i], animalsV[i], 1.0);
           if (c.a > 0.0) {
             animalsColor = c;
             break;
@@ -670,7 +742,7 @@
         c = animalsColor.a==0.0 ? worldColor : mix(worldColor, animalsColor.rgb, min(1.0, animalsColor.a));
         c = brushColorPass(c, distance(statePosFloor, floor((mouse + camera)/zoom)) / brushSize);
       }
-      vec4 ui = UI();
+      vec4 ui = UI() + UI2(c);
       c = mix(c.rgb, ui.rgb, ui.a);
       gl_FragColor = vec4(c, 1.0);
     }

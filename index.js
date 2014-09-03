@@ -1,4 +1,7 @@
-Math.seedrandom(Math.floor(Date.now() / 60000));
+var seed = Math.random();
+Math.seedrandom(seed);
+
+var C = document.createElement("canvas");
 
 // Game constants
 
@@ -10,17 +13,17 @@ var uiElements = [0, 1, 2, 3];
 var uiButtonSize = 64;
 
 var colors = [
-  0.11, 0.16, 0.23, // 0: nothing
+  0.11, 0.16, 0.23, // 0: air
   0.74, 0.66, 0.51, // 1: earth
   0.84, 0.17, 0.08, // 2: fire
   0.40, 0.75, 0.90, // 3: water
 
   // spawners
-  0.60, 0.00, 0.00, // 4: volcano
-  0.30, 0.60, 0.70, // 5: source of water
+  0.60, 0.00, 0.00, // 4: volcano (fire spawner)
+  0.30, 0.60, 0.70, // 5: source (water spawner)
 
-  0.15, 0.20, 0.27,  // 6: air left
-  0.07, 0.12, 0.19,  // 7: air right
+  0.15, 0.20, 0.27,  // 6: wind left
+  0.07, 0.12, 0.19,  // 7: wind right
   0.20, 0.60, 0.20   // 8: grass (forest)
 ];
 
@@ -177,25 +180,31 @@ document.addEventListener("keydown", function (e) {
 
 /////////// ANIMAL ///////////////////
 
-var sightw = 32, sighth = 12;
+var sightw = 20, sighth = 12;
 var sighthalfw = sightw / 2, sighthalfh = sighth / 2;
 
-function Animal (pos) {
-  // The buffer of the animal is its vision
-  this.p = pos;
+var cliffFear = -4;
+var climb = 3;
+
+function Animal (initialPosition) {
+  // p: position, t: targetted position
+  this.p = initialPosition;
+  this.t = 0;
+  // v: velocity
   this.v = [0, 0];
-  this.s = 0;
+  // b: The buffer of the animal is its vision
   this.b = new Uint8Array(sightw * sighth);
-  this.t = 0; // next decision time
+  // dt: next decision time
+  this.dt = 0;
 }
 
 // Animal functions
 // I'm not doing prototype to save bytes (better limit the usage of fields which are hard to minimize)
 
 function animalSyncSight (animal) {
+  // Cut the world buffer into the animal vision buffer
   var sx = Math.floor(animal.p[0] - sighthalfw);
   var sy = Math.floor(animal.p[1] - sighthalfh);
-  this.s = [sx,sy];
   for (var x=0; x<sightw; ++x) {
     for (var y=0; y<sighth; ++y) {
       var wx = x + sx;
@@ -205,59 +214,157 @@ function animalSyncSight (animal) {
   }
 }
 
-function animalAI (animal) {
-  animal.v[0] = 0.3 * Math.random() - 0.14;
+function canMoveSlope (fromY, toY) {
+  var dy = toY - fromY;
+  return toY !== -1 && toY != sighth && cliffFear <= dy && dy <= climb;
+}
+
+function animalSlopeX (animal, x, y) {
+  if (y == sighth) y--;
+  if (y == -1) y++;
+  while (y < sighth && ground(animal.b[x+y*sightw])) y++;
+  if (y < sighth) while (y >= 0 && !ground(animal.b[x+y*sightw])) y--;
+  return y;
+}
+
+function animalIdx (x, y) {
+  return x + y * sightw;
+}
+
+// Sometimes change his mind (after reaction time)
+function animalDecide (animal) {
+  var x, y, from;
+  var slopeLeft = [];
+  for (x=sighthalfw, y=sighthalfh; x>=0; --x) {
+    slopeLeft.push(y = animalSlopeX(animal, x, y));
+  }
+  var slopeRight = [];
+  for (x=sighthalfw, y=sighthalfh; x<sightw; ++x) {
+    slopeRight.push(y = animalSlopeX(animal, x, y));
+  }
+
+  /// If there is fire nearby, better run!!
+  var maxFireSee = 5;
+  for (i=0; i<maxFireSee; ++i) {
+    // left
+    x = sighthalfw - i;
+    y = slopeLeft[i];
+    if (animal.b[animalIdx(x, y+1)]==2 || animal.b[animalIdx(x, y+2)]==2) {
+      return animal.t = 1;
+    }
+
+    // right
+    x = sighthalfw + i;
+    y = slopeRight[i];
+    if (animal.b[animalIdx(x, y+1)]==2 || animal.b[animalIdx(x, y+2)]==2) {
+      return animal.t = -1;
+    }
+  }
+
+  /// Take the more distant path
+  var moveRightDist = 0;
+  for (
+    x=1, from = slopeRight[0];
+    x<sighthalfw && canMoveSlope(from, (from = slopeRight[x]));
+    ++x, ++moveRightDist);
+  var moveLeftDist = 0;
+  for (
+    x=1, from = slopeLeft[0];
+    x<sighthalfw && canMoveSlope(from, (from = slopeLeft[x]));
+    ++x, ++moveLeftDist);
+  var d = moveRightDist - moveLeftDist + 2 * Math.random() * (animal.v[0] >= 0 ? 1 : -1);
+  animal.t = d>=0 ? 0.6 : -0.6; // go right
+}
+
+// Apply a decision each tick
+function animalMove (animal) {
+  animal.v[0] = 0.4 * animal.t;
+
+  // TODO: some move can be impossible: when there is a wall in the head.
+  animal.p[0] += animal.v[0];
+  animal.p[1] += animal.v[1];
 }
 
 function ground (i) {
   return i == 1 || i == 4 || i == 5;
 }
 
+/**
+ * reasons
+ * 0: falls in a cliff
+ * 1: stuck in earth
+ * 2: burned by fire
+ */
+function animalDie (animal, reason) {
+  animal.d = 1;
+  console.log(animal, "die:", ["falls in a cliff","stuck in earth","burned by fire"][reason]);
+}
+
 function animalUpdate (animal) {
-  var i, y;
+  if (animal.d) return; //FIXME
+
+  var i, x, y;
+
   animalSyncSight(animal);
-  var now = Date.now();
-  if (now > animal.t) {
-    animal.t = now + 500 + 500 * Math.random();
-    animalAI(animal);
+
+  for (x=-3; x<=1; ++x) {
+    for (y=0; y<=5; ++y) {
+      if (animal.b[sightw * (sighthalfh + y) + sighthalfw + x] == 2) {
+        animalDie(animal, 2);
+        break;
+      }
+    }
   }
 
-  // Ground will push up
+  // TODO refactor with animalSlope()
+
+  // Climb on ground : FIXME does not work anymore?
   y = 0;
   do {
     i = sightw * (sighthalfh + y) + sighthalfw;
     y ++;
   } while (y < sighthalfh && ground(animal.b[i]));
 
-  var stuck = false; // FIXME
-  if (stuck) {
-    // Animal is stuck
+  // can't climb == stuck in ground -> die
+  if (y == sighthalfh) {
+    return animalDie(animal, 1);
   }
-  else {
-    animal.p[1] += y;
 
+  // fall on ground
+  do {
+    i = sightw * (sighthalfh + y) + sighthalfw;
+    y --;
+  } while (0 <= i && i < sightw * sighth && !ground(animal.b[i]));
+  y += 2; // why !?
+
+  // Animal fall in a cliff
+  if (y == -sighthalfh) {
+    animal.f = 1; // falling for death!
+  }
+  // animal reaches the ground violently
+  if (y == 0 && animal.f)
+    return animalDie(animal, 0);
+
+  // Apply animal y displacement & refresh the sight
+  if (y) {
+    animal.p[1] += y;
     animalSyncSight(animal);
-
-    // Gravity
-    y = 1;
-    do {
-      i = sightw * (sighthalfh + y) + sighthalfw;
-      y --;
-    } while (0 <= i && i < sightw * sighth && !ground(animal.b[i]));
-    y ++;
-
-    animal.p[1] += y;
-
-    animal.p[0] += animal.v[0];
-    animal.p[1] += animal.v[1];
   }
+
+  // Edge case where the animal would fall forever
+  if (animal.p[1] < 0) return animalDie(animal, 0);
+
+  var now = Date.now();
+  if (now > animal.dt) {
+    animal.dt = now + 500 + 500 * Math.random();
+    animalDecide(animal);
+  }
+  animalMove(animal);
 }
 
 //////////////////////////////////////
 
-
 var gl = C.getContext("webgl") || C.getContext("experimental-webgl");
-
 
 var shader, shaderSrc, shaderType, program;
 
@@ -353,6 +460,7 @@ gl.attachShader(program, shader);
 gl.linkProgram(program);
 validateProg(program);
 
+var logicSeedL = gl.getUniformLocation(program, "seed");
 var logicTickL = gl.getUniformLocation(program, "tick");
 var logicColorsL = gl.getUniformLocation(program, "colors");
 var logicStateL = gl.getUniformLocation(program, "state");
@@ -389,6 +497,7 @@ gl.bindFramebuffer(gl.FRAMEBUFFER, logicFramebuffer);
 gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, logicTexture, 0);
 
 gl.useProgram(program);
+gl.uniform1f(logicSeedL, seed);
 gl.uniform1i(logicStateL, 0);
 gl.uniform2fv(logicSizeL, worldSize);
 gl.uniform3fv(logicColorsL, colors);
@@ -407,12 +516,14 @@ for(i = 0; i < data.length; i += 4) affectColor(data, i, (function (i) {
   var y = Math.floor(j / worldSize[0]);
 
   if (r < 0.25 + 0.6 * step(20, 0, y) - step(worldSize[1]-60, worldSize[1], y) || r > 0.7 - 0.4 * step(30, 0, y) + 0.2 * step(worldSize[1]-30, worldSize[1], y) ) {
+    /*
     // Volcano
     if (r < 0.25 * step(80, 0, y))
       return 4;
     // Source
     if (r > 1.0 - 0.2 * step(worldSize[1] - 150, worldSize[1], y))
       return 5;
+    */
     // Earth
     return 1;
   }
@@ -429,9 +540,9 @@ for(i = 0; i < data.length; i += 4) affectColor(data, i, (function (i) {
   */
   }(i)));
 
-for (i = 0; i<20; ++i) {
+for (i = 0; i < 20; ++i) {
   var x = Math.floor(50 + i * (5+4*Math.random()) + 50 * Math.random());
-  var y = Math.floor(lowestYs[x] + 100 * Math.random());
+  var y = Math.floor(lowestYs[x]);
   var a = new Animal([ x, y ]);
   animals.push(a);
 }
@@ -440,7 +551,7 @@ gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, worldSize[0], worldSize[1], 0, gl.RGBA,
 
 var start = Date.now();
 var lastUpdate = 0;
-var lastRefreshWorld = 0;
+var lastRefreshWorld = 0; // Help the GPU to not spam request of "readPixels"
 function update () {
   var now = Date.now();
   if (now-lastUpdate < updateRate) return;
@@ -509,6 +620,8 @@ function update () {
   requestAnimationFrame(render);
 }());
 
+document.body.innerHTML = '';
+document.body.appendChild(C);
 
 ///////////// UTILITIES ////////////////////
 
@@ -620,7 +733,4 @@ function validateProg (program) {
      throw new Error(program+" "+gl.getProgramInfoLog(program));
    }
 }
-
-
-
 
