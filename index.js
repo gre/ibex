@@ -8,6 +8,7 @@ var C = document.createElement("canvas");
 // in milliseconds
 var updateRate = 35;
 var refreshWorldRate = 200;
+var initialAnimals = 20;
 
 var uiElements = [0, 1, 2, 3];
 var uiButtonSize = 64;
@@ -180,7 +181,7 @@ document.addEventListener("keydown", function (e) {
 
 /////////// ANIMAL ///////////////////
 
-var sightw = 20, sighth = 12;
+var sightw = 24, sighth = 18;
 var sighthalfw = sightw / 2, sighthalfh = sighth / 2;
 
 var cliffFear = -4;
@@ -196,6 +197,10 @@ function Animal (initialPosition) {
   this.b = new Uint8Array(sightw * sighth);
   // dt: next decision time
   this.dt = 0;
+
+  // this.d <- died flag
+  // this.sl <- stats left
+  // this.sr <- stats right
 }
 
 // Animal functions
@@ -212,12 +217,24 @@ function animalSyncSight (animal) {
       animal.b[x + y * sightw] = wx<0||wy<0||wx>=worldSize[0]||wy>=worldSize[1] ? 0 : worldPixelBuf[wx+wy*worldSize[0]];
     }
   }
+
+  animalGenStats(animal);
 }
 
+function animalIdx (x, y) {
+  return x + y * sightw;
+}
+
+function ground (i) {
+  return i == 1 || i == 4 || i == 5;
+}
+
+/*
 function canMoveSlope (fromY, toY) {
   var dy = toY - fromY;
   return toY !== -1 && toY != sighth && cliffFear <= dy && dy <= climb;
 }
+*/
 
 function animalSlopeX (animal, x, y) {
   if (y == sighth) y--;
@@ -227,66 +244,126 @@ function animalSlopeX (animal, x, y) {
   return y;
 }
 
-function animalIdx (x, y) {
-  return x + y * sightw;
+/**
+ * Stats:
+ * sl & sr are 2 arrays of left & right exploration stats.
+ * Each array:
+ * f (floor): the position of a solid block (under the animal)
+ * c (ceil): the position of the ceil on top of this solid block
+ * h (height): ceil - floor - 1
+ * s (slope): the slope in pixels – how much pixel to reach next tiles? (tiles because may be smoothed)
+ * e (elements): count of elements in the [floor,ceil] range. (array with same indexes)
+ *
+ * size of the array: stops when the animal can't reach a place.
+ */
+function animalGenStats (animal) {
+  function stats (dir) {
+    var a, x, y, i, ret = [];
+
+    var floors = [];
+    for (x=sighthalfw, y=sighthalfh; 0<=x && x<sightw; x += dir) {
+      floors.push(y = animalSlopeX(animal, x, y));
+    }
+
+    var countA = 0;
+    for (i=0, x=sighthalfw, a=1; 0<=x && x<sightw; x += dir, ++i) {
+      var f = floors[i],
+          c,
+          h,
+          s,
+          e = [0,0,0,0,0,0,0,0,0];
+      var pixels = new Uint8Array(sighth);
+      for (y=0; y<sighth; ++y) pixels[y] = animal.b[animalIdx(x, y)];
+
+      // Compute slope
+      s = (floors[i+1]||f) - f; // TODO smoothed version
+      // Compute ceil
+      for (c = f+1; c<sighth && !ground(pixels[c]); c++);
+      // Compute height
+      h = c - f - 1;
+      // Stop if conditions are reachable for the animal
+      if (h < 4 /* min height */ || Math.abs(s) > 4 /* max fall / climb */) {
+        a = 0;
+      }
+      // Compute elements
+      for (y=f; y<=c; ++y) e[pixels[y]] ++;
+
+      ret.push({f:f,c:c,h:h,s:s,e:e,a:a});
+      if (a) countA ++;
+    }
+    ret.a = countA;
+    return ret;
+  }
+  animal.sl = stats(-1);
+  animal.sr = stats(1);
 }
+
 
 // Sometimes change his mind (after reaction time)
 function animalDecide (animal) {
-  var x, y, from;
-  var slopeLeft = [];
-  for (x=sighthalfw, y=sighthalfh; x>=0; --x) {
-    slopeLeft.push(y = animalSlopeX(animal, x, y));
+  // TODO: calculate the center of animals & have more chance to try to reach it.
+  var i;
+  var r = Math.random();
+  if (r < 0.2) {
+    animal.t = 0.01 * (0.5-Math.random());
   }
-  var slopeRight = [];
-  for (x=sighthalfw, y=sighthalfh; x<sightw; ++x) {
-    slopeRight.push(y = animalSlopeX(animal, x, y));
+  else if (r < 0.8) {
+    var d = animal.sr.a - animal.sl.a + 3 * Math.random();
+    animal.t = d>=0 ? 0.6 : -0.6;
   }
 
-  /// If there is fire nearby, better run!!
-  var maxFireSee = 5;
+  var maxFireSee = sighthalfw;
+  var fire = 0;
   for (i=0; i<maxFireSee; ++i) {
-    // left
-    x = sighthalfw - i;
-    y = slopeLeft[i];
-    if (animal.b[animalIdx(x, y+1)]==2 || animal.b[animalIdx(x, y+2)]==2) {
-      return animal.t = 1;
+    if (animal.sl[i] && animal.sl[i].e[2]) {
+      fire = -1;
+      break;
     }
-
-    // right
-    x = sighthalfw + i;
-    y = slopeRight[i];
-    if (animal.b[animalIdx(x, y+1)]==2 || animal.b[animalIdx(x, y+2)]==2) {
-      return animal.t = -1;
+    if (animal.sr[i] && animal.sr[i].e[2]) {
+      fire = 1;
+      break;
     }
   }
+  if (fire) {
+    animal.t = -1.2 * fire;
+  }
 
-  /// Take the more distant path
-  var moveRightDist = 0;
-  for (
-    x=1, from = slopeRight[0];
-    x<sighthalfw && canMoveSlope(from, (from = slopeRight[x]));
-    ++x, ++moveRightDist);
-  var moveLeftDist = 0;
-  for (
-    x=1, from = slopeLeft[0];
-    x<sighthalfw && canMoveSlope(from, (from = slopeLeft[x]));
-    ++x, ++moveLeftDist);
-  var d = moveRightDist - moveLeftDist + 2 * Math.random() * (animal.v[0] >= 0 ? 1 : -1);
-  animal.t = d>=0 ? 0.6 : -0.6; // go right
+  if (Math.random()<0.2) {
+    // Jump
+    var dir = 1;
+    animal.p[1] ++;
+    animal.v[0] = 3 * dir;
+    animal.v[1] = 1;
+  }
 }
 
 // Apply a decision each tick
 function animalMove (animal) {
-  animal.v[0] = 0.4 * animal.t;
+  var s = animal.sl[0], f = s.f, groundDiff = sighthalfh - (f + 1);
 
-  // TODO: some move can be impossible: when there is a wall in the head.
-  animal.p[0] += animal.v[0];
-  animal.p[1] += animal.v[1];
-}
+  if (groundDiff == 0) {
+    animal.v[0] = 0.4 * animal.t;
+  }
 
-function ground (i) {
-  return i == 1 || i == 4 || i == 5;
+  // TODO hit wall detection
+
+  var p = [ animal.p[0] + animal.v[0], animal.p[1] + animal.v[1] ];
+  if (groundDiff == 0) {
+    var dx = Math.floor(p[0]) - Math.floor(animal.p[0]);
+    if (dx) {
+      var s = dx > 0 ? animal.sr : animal.sl;
+      dx = Math.abs(dx);
+      if (s[dx] && s[dx].a) {
+        animal.p = p;
+      }
+    }
+    else {
+      animal.p = p;
+    }
+  }
+  else {
+    animal.p = p;
+  }
 }
 
 /**
@@ -301,58 +378,51 @@ function animalDie (animal, reason) {
 }
 
 function animalUpdate (animal) {
-  if (animal.d) return; //FIXME
-
-  var i, x, y;
-
+  if (animal.d) return;
   animalSyncSight(animal);
 
-  for (x=-3; x<=1; ++x) {
+  var x, y,
+      s = animal.sl[0],
+      f = s.f,
+      groundDiff = sighthalfh - (f + 1);
+
+  // fire burns animal
+  if (s.e[2]) {
     for (y=0; y<=5; ++y) {
-      if (animal.b[sightw * (sighthalfh + y) + sighthalfw + x] == 2) {
+      if (animal.b[animalIdx(sighthalfw, sighthalfh + y)] == 2) {
         animalDie(animal, 2);
         break;
       }
     }
   }
 
-  // TODO refactor with animalSlope()
-
-  // Climb on ground : FIXME does not work anymore?
-  y = 0;
-  do {
-    i = sightw * (sighthalfh + y) + sighthalfw;
-    y ++;
-  } while (y < sighthalfh && ground(animal.b[i]));
-
-  // can't climb == stuck in ground -> die
-  if (y == sighthalfh) {
-    return animalDie(animal, 1);
-  }
-
-  // fall on ground
-  do {
-    i = sightw * (sighthalfh + y) + sighthalfw;
-    y --;
-  } while (0 <= i && i < sightw * sighth && !ground(animal.b[i]));
-  y += 2; // why !?
-
-  // Animal fall in a cliff
-  if (y == -sighthalfh) {
-    animal.f = 1; // falling for death!
-  }
   // animal reaches the ground violently
-  if (y == 0 && animal.f)
+  if (!groundDiff && animal.v[1] < -2) {
     return animalDie(animal, 0);
+  }
 
-  // Apply animal y displacement & refresh the sight
-  if (y) {
-    animal.p[1] += y;
-    animalSyncSight(animal);
+  if (groundDiff) {
+    // ground buries animal
+    if (f > sighthalfh && groundDiff < -4) return animalDie(animal, 1);
+
+    if (groundDiff > 0) {
+      // Gravity
+      animal.v[1] -= 0.15;
+    }
+    else {
+      // move up
+      animal.p[1] -= groundDiff;
+    }
+  }
+  else {
+    animal.v[1] = 0;
+    animal.p[1] = Math.floor(animal.p[1]);
   }
 
   // Edge case where the animal would fall forever
   if (animal.p[1] < 0) return animalDie(animal, 0);
+
+  animalSyncSight(animal);
 
   var now = Date.now();
   if (now > animal.dt) {
@@ -540,7 +610,7 @@ for(i = 0; i < data.length; i += 4) affectColor(data, i, (function (i) {
   */
   }(i)));
 
-for (i = 0; i < 20; ++i) {
+for (i = 0; i < initialAnimals; ++i) {
   var x = Math.floor(50 + i * (5+4*Math.random()) + 50 * Math.random());
   var y = Math.floor(lowestYs[x]);
   var a = new Animal([ x, y ]);

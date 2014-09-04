@@ -31,6 +31,7 @@ Improve map generation
 Improve design
 ---
 - perlin noise for the earth?
+- mushrooms grows when no water. if mushroom touches green -> green
 
 How to make the game more challenging
 ---
