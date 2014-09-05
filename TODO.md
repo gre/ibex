@@ -3,10 +3,8 @@ Game Goal
 - Protect & escort some wild animals into a safe place.
 - end of the world from left to right. rush to the right. infinite exploration.
 
-Better UI: circular UI
+Figure out the game play
 ---
-- circular UI. click where to place, drag a bit, release to select an element.
-- reconciliate with click.
 - ?? hold it to size it bigger.
 - ?? cooldown
 

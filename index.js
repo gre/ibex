@@ -10,9 +10,6 @@ var updateRate = 35;
 var refreshWorldRate = 200;
 var initialAnimals = 20;
 
-var uiElements = [0, 1, 2, 3];
-var uiButtonSize = 64;
-
 var colors = [
   0.11, 0.16, 0.23, // 0: air
   0.74, 0.66, 0.51, // 1: earth
@@ -37,9 +34,11 @@ var worldRefreshTick = 0;
 var worldSize = [ 512, 256 ];
 var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
 var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
+var worldStartX = 0;
+
 var resolution;
 var zoom = 4;
-var camera = [ 0, -uiButtonSize ]; // Camera is in resolution coordinate (not worldSize)
+var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
 var cameraV = [0, 0];
 var mouse = [ 0, 0 ];
 
@@ -47,19 +46,13 @@ var draw = 0;
 var draggingElement = 0;
 var drawPosition;
 var drawObject;
-var drawRadius = 8;
+var drawRadius;
 
 var animals = [];
 
 // Game events
 
 window.addEventListener("resize", onResize);
-
-var dragStart;
-var mousedownTime;
-var dragCam;
-var isValidDrag;
-var autoScroll;
 
 function clamp (a, b, x) {
   return Math.max(a, Math.min(x, b));
@@ -68,6 +61,31 @@ function clamp (a, b, x) {
 function posToWorld (p) {
   return [ (camera[0] + p[0]) / zoom, (camera[1] + p[1]) / zoom ];
 }
+
+function setCam (c) {
+  camera = [
+    clamp(0, zoom * worldSize[0] - resolution[0], c[0]),
+    clamp(0, 50+zoom * worldSize[1] - resolution[1], c[1])
+  ];
+}
+
+function posE (e) {
+  return [ e.clientX, resolution[1] - e.clientY ];
+}
+
+function dist (a, b) {
+  var dx = a[0] - b[0],
+      dy = a[1] - b[1];
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+/*
+var dragStart;
+var mousedownTime;
+var dragCam;
+var isValidDrag;
+var autoScroll;
+
 function resetMouse (e) {
   autoScroll = 0;
   isValidDrag = 0;
@@ -77,87 +95,101 @@ function resetMouse (e) {
   cameraV = [0,0];
   C.style.cursor = "default";
 }
+*/
+var dragStart, dragCam, isValidDrag;
 
-function setCam (c) {
-  camera = [
-    clamp(0, zoom * worldSize[0] - resolution[0], c[0]),
-    clamp(-uiButtonSize, 50+zoom * worldSize[1] - resolution[1], c[1])
-  ];
+function resetMouse () {
+  dragStart = dragCam = isValidDrag = 0;
+  cameraV = [0,0];
+  C.style.cursor = "default";
+}
+
+resetMouse();
+
+function keyDraw () {
+  var p = mouse;
+  if (keysDown[87]||keysDown[90]) {
+    draw = 1;
+    drawPosition = posToWorld(p);
+    drawObject = 0;
+    drawRadius = 6;
+  }
+  else if (keysDown[88]) {
+    draw = 1;
+    drawPosition = posToWorld(p);
+    drawObject = 1;
+    drawRadius = 6;
+  }
+  else if (keysDown[67]) {
+    draw = 1;
+    drawPosition = posToWorld(p);
+    drawObject = 2;
+    drawRadius = 4;
+  }
+  else if (keysDown[86]) {
+    draw = 1;
+    drawPosition = posToWorld(p);
+    drawObject = 3;
+    drawRadius = 4;
+  }
 }
 
 C.addEventListener("mouseleave", resetMouse);
 
-C.addEventListener("mousedown", function (e) {
-  e.preventDefault();
-  dragStart = posE(e);
-  mousedownTime = Date.now();
-  var xElIndex = Math.floor(dragStart[0] / uiButtonSize);
-  if (dragStart[1] < uiButtonSize && xElIndex < uiElements.length) {
-    draggingElement = 1;
-    drawObject = uiElements[xElIndex];
-    C.style.cursor = "move";
-  }
-  else {
-    C.style.cursor = "move";
-    dragCam = [].concat(camera);
-  }
-});
-C.addEventListener("mouseup", function (e) {
-  var p = posE(e);
-  if (isValidDrag && draggingElement) {
-    draw = 1;
-    drawPosition = posToWorld(p);
-  }
-  resetMouse();
-});
 C.addEventListener("mousemove", function (e) {
   var p = posE(e);
   mouse = p;
-  if (!dragCam && !draggingElement) {
-    var xElIndex = Math.floor(p[0] / uiButtonSize);
-    if (p[1] < uiButtonSize && xElIndex < uiElements.length) {
-      C.style.cursor = "pointer";
-    }
-    else {
-      C.style.cursor = "default";
-    }
-  }
-  else {
-    e.preventDefault();
+  if (dragStart) {
     var dx = p[0] - dragStart[0];
     var dy = p[1] - dragStart[1];
+
     if (dragCam) {
       setCam([ dragCam[0] - dx, dragCam[1] - dy ]);
     }
-    if (draggingElement) {
-      isValidDrag = isValidDrag || p[1] > uiButtonSize;
-      autoScroll = autoScroll || p[1] > camAutoThreshold;
-      if (autoScroll) {
-        cameraV=[0,0];
-        if (p[0] > resolution[0]-camAutoThreshold) {
-          cameraV[0] = camAutoSpeed;
-        }
-        if (p[0] < camAutoThreshold) {
-          cameraV[0] = -camAutoSpeed;
-        }
-        if (p[1] > resolution[1]-camAutoThreshold) {
-          cameraV[1] = camAutoSpeed;
-        }
-        if (p[1] < camAutoThreshold) {
-          cameraV[1] = -camAutoSpeed;
-        }
+    else {
+      var d = dist(dragStart, p);
+      if (d > 60) {
+        dragCam = [ camera[0] + dx, camera[1] + dy ];
+        C.style.cursor = "move";
+      }
+      if (d > 10) {
+        drawObject = 2 * (dy < 0) + (dx > 0);
+        C.style.cursor = "pointer";
+      }
+      else {
+        drawObject = -1;
+        C.style.cursor = "default";
       }
     }
   }
+  else {
+    keyDraw();
+  }
 });
 
-function posE (e) {
-  return [ e.clientX, resolution[1] - e.clientY ];
-}
+C.addEventListener("mousedown", function (e) {
+  e.preventDefault();
+  dragStart = posE(e);
+  dragCam = 0;
+  drawObject = -1;
+  drawRadius = 10;
+});
 
-var keysDown = {};
-for (var i=0; i<999; ++i) keysDown[i]=0;
+C.addEventListener("mouseup", function (e) {
+  var p = posE(e);
+  if (!dragCam && drawObject != -1) {
+    draw = 1;
+    drawPosition = posToWorld(dragStart);
+    drawRadius = 10;
+  }
+  resetMouse();
+});
 
+
+
+// Keyboard
+
+var keysDown = new Uint8Array(200); // we do that because nicely initialized to 0
 
 //
 //       38
@@ -168,6 +200,7 @@ function handleKeys () {
       dx = keysDown[39]-keysDown[37],
       dy = keysDown[38]-keysDown[40];
   cameraV = [ s*dx, s*dy ];
+  keyDraw();
 }
 
 document.addEventListener("keyup", function (e) {
@@ -178,7 +211,7 @@ document.addEventListener("keyup", function (e) {
 document.addEventListener("keydown", function (e) {
   var w = e.which;
   keysDown[w] = 1;
-  if (37 <= w && w <= 40) {
+  if (37 <= w && w <= 40/* || w==87 || w==90 || w==88 || w==67 || w==86*/) {
     e.preventDefault();
   }
   handleKeys();
@@ -214,14 +247,24 @@ function Animal (initialPosition) {
   // this.h <- hash for caching the animalSyncSight
 }
 
-function animalIdx (x, y) {
+function animalIdx (animal, x, y) {
   return x + y * sightw;
+
+  // TODO
+  var sx = Math.floor(animal.p[0] - sighthalfw);
+  var sy = Math.floor(animal.p[1] - sighthalfh);
+  return sx + (x-worldStartX) + (sy + y) * sightw;
 }
 
 // Animal functions
 // I'm not doing prototype to save bytes (better limit the usage of fields which are hard to minimize)
 
 function animalSyncSight (animal) {
+
+
+  animal.b = worldPixelBuf;
+  
+  // TODO OMG we shouldn't do this!!! directly query the world instead
   // Cut the world buffer into the animal vision buffer
   var sx = Math.floor(animal.p[0] - sighthalfw);
   var sy = Math.floor(animal.p[1] - sighthalfh);
@@ -274,7 +317,7 @@ function animalSyncSight (animal) {
           s,
           e = [0,0,0,0,0,0,0,0,0];
       var pixels = new Uint8Array(sighth);
-      for (y=0; y<sighth; ++y) pixels[y] = animal.b[animalIdx(x, y)];
+      for (y=0; y<sighth; ++y) pixels[y] = animal.b[animalIdx(animal, x, y)];
 
       // Compute slope
       s = (floors[i+1]||f) - f; // TODO smoothed version
@@ -322,7 +365,7 @@ function animalUpdate (animal) {
   // fire burns animal
   if (s.e[2]) {
     for (y=0; y<=5; ++y) {
-      if (animal.b[animalIdx(sighthalfw, sighthalfh + y)] == 2) {
+      if (animal.b[animalIdx(animal, sighthalfw, sighthalfh + y)] == 2) {
         animalDie(animal, 2);
         break;
       }
@@ -470,19 +513,19 @@ var renderAnimalsPL = gl.getUniformLocation(program, "animalsP");
 var renderAnimalsVL = gl.getUniformLocation(program, "animalsV");
 var renderAnimalsLengthL = gl.getUniformLocation(program, "animalsLength");
 var renderColorsL = gl.getUniformLocation(program, "colors");
-var renderUiElementsL = gl.getUniformLocation(program, "uiElements");
 var renderDrawObjectL = gl.getUniformLocation(program, "drawObject");
 var renderDrawDragL = gl.getUniformLocation(program, "draggingElement");
 var renderDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
 
 var cameraL = gl.getUniformLocation(program, "camera");
 var mouseL = gl.getUniformLocation(program, "mouse");
+var dragStartL = gl.getUniformLocation(program, "dragStart");
+var enableCursorL = gl.getUniformLocation(program, "enableCursor");
 var resolutionL = gl.getUniformLocation(program, "resolution");
 
 gl.uniform1i(renderStateL, 0);
 gl.uniform2fv(renderWorldSizeL, worldSize);
 gl.uniform3fv(renderColorsL, colors);
-gl.uniform1iv(renderUiElementsL, uiElements);
 
 function onResize () {
   resolution = [
@@ -538,18 +581,6 @@ var logicPositionL = gl.getAttribLocation(program, "position");
 
 gl.enableVertexAttribArray(logicPositionL);
 
-function step (a, b, x) {
-  return Math.max(0, Math.min((x-a) / (b-a), 1));
-}
-
-function affectColor (buf, i, c) {
-  buf[i+0] = 255 * colors[c * 3+0];
-  buf[i+1] = 255 * colors[c * 3+1];
-  buf[i+2] = 255 * colors[c * 3+2];
-  buf[i+3] = 255;
-}
-
-var data = new Uint8Array(4 * worldSize[0] * worldSize[1]);
 var logicTexture = gl.createTexture();
 gl.activeTexture(gl.TEXTURE0);
 gl.bindTexture(gl.TEXTURE_2D, logicTexture);
@@ -569,57 +600,75 @@ gl.uniform3fv(logicColorsL, colors);
 
 var logicProgram = program;
 
+
+function step (a, b, x) {
+  return Math.max(0, Math.min((x-a) / (b-a), 1));
+}
+
+function affectColor (buf, i, c) {
+  buf[i+0] = 255 * colors[c * 3+0];
+  buf[i+1] = 255 * colors[c * 3+1];
+  buf[i+2] = 255 * colors[c * 3+2];
+  buf[i+3] = 255;
+}
+
+function generate(startX) {
+  var i;
+  var perlin = generatePerlinNoise(worldSize[0], worldSize[1], 5, 0.1, 0.03);
+  for(i = 0; i < worldPixelBuf.length; i ++) {
+    var r = perlin[i];
+    var x = i % worldSize[0];
+    var y = Math.floor(i / worldSize[0]);
+    if (startX <= x) {
+      if (r < 0.25 + 0.6 * step(50, 0, y) - step(worldSize[1]-60, worldSize[1], y) || r > 0.7 - 0.4 * step(40, 0, y) + 0.2 * step(worldSize[1]-30, worldSize[1], y) ) {
+        worldPixelBuf[i] = 1;
+      }
+      else {
+        worldPixelBuf[i] = 0;
+      }
+    }
+  }
+
+  for(i = 0; i < worldPixelRawBuf.length; i += 4)
+    affectColor(worldPixelRawBuf, i, worldPixelBuf[i/4]);
+
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, worldSize[0], worldSize[1], 0, gl.RGBA, gl.UNSIGNED_BYTE, worldPixelRawBuf);
+}
+
+function resize (fromX, toX) {
+  update(1);
+  var newWorldSize = [ toX-fromX, worldSize[1] ];
+  var newWorldPixelRawBuf = new Uint8Array(newWorldSize[0] * newWorldSize[1] * 4);
+  var newWorldPixelBuf = new Uint8Array(newWorldSize[0] * newWorldSize[1]);
+
+  // TODO copy at the right place
+
+  worldSize = newWorldSize;
+  worldPixelRawBuf = newWorldPixelRawBuf;
+  worldPixelBuf = newWorldPixelBuf;
+  worldStartX = fromX;
+
+  var genStartX = toX - fromX;
+  generate(genStartX);
+}
+
 //////////// RUN THE GAME /////////////////
 
-var i;
-var perlin = generatePerlinNoise(worldSize[0], worldSize[1], 5, 0.1, 0.03);
-var lowestYs = [];
-for(i = 0; i < data.length; i += 4) affectColor(data, i, (function (i) {
-  var j = i / 4;
-  var r = perlin[j];
-  var x = j % worldSize[0];
-  var y = Math.floor(j / worldSize[0]);
-
-  if (r < 0.25 + 0.6 * step(20, 0, y) - step(worldSize[1]-60, worldSize[1], y) || r > 0.7 - 0.4 * step(30, 0, y) + 0.2 * step(worldSize[1]-30, worldSize[1], y) ) {
-    /*
-    // Volcano
-    if (r < 0.25 * step(80, 0, y))
-      return 4;
-    // Source
-    if (r > 1.0 - 0.2 * step(worldSize[1] - 150, worldSize[1], y))
-      return 5;
-    */
-    // Earth
-    return 1;
-  }
-  else {
-    if (!lowestYs[x]) lowestYs[x] = y;
-  }
-
-  return 0;
-
-  /*
-
-  if (0.60 < r) affectColor(data, i, 1);
-  if (0.85 < r) affectColor(data, i, 5);
-  */
-  }(i)));
+generate(0);
 
 for (i = 0; i < initialAnimals; ++i) {
   var x = Math.floor(50 + i * (5+4*Math.random()) + 50 * Math.random());
-  var y = Math.floor(lowestYs[x]);
+  var y = Math.floor(50 + 200 * Math.random());
   var a = new Animal([ x, y ]);
   animals.push(a);
 }
 
-gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, worldSize[0], worldSize[1], 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
-
 var start = Date.now();
 var lastUpdate = 0;
 var lastRefreshWorld = 0; // Help the GPU to not spam request of "readPixels"
-function update () {
+function update (forceRead) {
   var now = Date.now();
-  if (now-lastUpdate < updateRate) return;
+  if (!forceRead && now-lastUpdate < updateRate) return;
   lastUpdate = now;
   gl.useProgram(logicProgram);
   gl.uniform1f(logicTickL, tick);
@@ -636,7 +685,7 @@ function update () {
   gl.vertexAttribPointer(logicPositionL, 2, gl.FLOAT, gl.FALSE, 0, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, logicFramebuffer);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  if (now - lastRefreshWorld >= refreshWorldRate) {
+  if (forceRead || now - lastRefreshWorld >= refreshWorldRate) {
     lastRefreshWorld = now;
     gl.readPixels(0, 0, worldSize[0], worldSize[1], gl.RGBA, gl.UNSIGNED_BYTE, worldPixelRawBuf);
     parseColors(worldPixelRawBuf, worldPixelBuf);
@@ -672,14 +721,14 @@ function update () {
   gl.uniform1f(renderZoomL, zoom);
   gl.uniform2fv(cameraL, camera);
   gl.uniform2fv(mouseL, mouse);
+  if (dragStart) gl.uniform2fv(dragStartL, dragStart);
+  gl.uniform1i(enableCursorL, !!dragStart && !dragCam);
   gl.uniform2fv(renderAnimalsPL, animalPositions);
   gl.uniform2fv(renderAnimalsVL, animalVelocities);
   gl.uniform1i(renderAnimalsLengthL, animals.length);
   gl.uniform1i(renderDrawDragL, draggingElement);
-  if (draggingElement) {
-    gl.uniform1f(renderDrawRadiusL, drawRadius);
-    gl.uniform1i(renderDrawObjectL, drawObject);
-  }
+  gl.uniform1f(renderDrawRadiusL, drawRadius);
+  gl.uniform1i(renderDrawObjectL, drawObject);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
