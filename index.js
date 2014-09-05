@@ -33,6 +33,7 @@ var camAutoThreshold = 160;
 
 // Game states
 var tick = 0;
+var worldRefreshTick = 0;
 var worldSize = [ 512, 256 ];
 var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
 var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
@@ -210,6 +211,9 @@ function animalSyncSight (animal) {
   // Cut the world buffer into the animal vision buffer
   var sx = Math.floor(animal.p[0] - sighthalfw);
   var sy = Math.floor(animal.p[1] - sighthalfh);
+  var hash = worldRefreshTick+'_'+sx+'_'+sy;
+  if (hash === animal.h) return;
+  animal.h = hash;
   for (var x=0; x<sightw; ++x) {
     for (var y=0; y<sighth; ++y) {
       var wx = x + sx;
@@ -298,74 +302,6 @@ function animalGenStats (animal) {
   animal.sr = stats(1);
 }
 
-
-// Sometimes change his mind (after reaction time)
-function animalDecide (animal) {
-  // TODO: calculate the center of animals & have more chance to try to reach it.
-  var i;
-  var r = Math.random();
-  if (r < 0.2) {
-    animal.t = 0.01 * (0.5-Math.random());
-  }
-  else if (r < 0.8) {
-    var d = animal.sr.a - animal.sl.a + 3 * Math.random();
-    animal.t = d>=0 ? 0.6 : -0.6;
-  }
-
-  var maxFireSee = sighthalfw;
-  var fire = 0;
-  for (i=0; i<maxFireSee; ++i) {
-    if (animal.sl[i] && animal.sl[i].e[2]) {
-      fire = -1;
-      break;
-    }
-    if (animal.sr[i] && animal.sr[i].e[2]) {
-      fire = 1;
-      break;
-    }
-  }
-  if (fire) {
-    animal.t = -1.2 * fire;
-  }
-
-  if (Math.random()<0.2) {
-    // Jump
-    var dir = 1;
-    animal.p[1] ++;
-    animal.v[0] = 3 * dir;
-    animal.v[1] = 1;
-  }
-}
-
-// Apply a decision each tick
-function animalMove (animal) {
-  var s = animal.sl[0], f = s.f, groundDiff = sighthalfh - (f + 1);
-
-  if (groundDiff == 0) {
-    animal.v[0] = 0.4 * animal.t;
-  }
-
-  // TODO hit wall detection
-
-  var p = [ animal.p[0] + animal.v[0], animal.p[1] + animal.v[1] ];
-  if (groundDiff == 0) {
-    var dx = Math.floor(p[0]) - Math.floor(animal.p[0]);
-    if (dx) {
-      var s = dx > 0 ? animal.sr : animal.sl;
-      dx = Math.abs(dx);
-      if (s[dx] && s[dx].a) {
-        animal.p = p;
-      }
-    }
-    else {
-      animal.p = p;
-    }
-  }
-  else {
-    animal.p = p;
-  }
-}
-
 /**
  * reasons
  * 0: falls in a cliff
@@ -381,7 +317,7 @@ function animalUpdate (animal) {
   if (animal.d) return;
   animalSyncSight(animal);
 
-  var x, y,
+  var x, y, i,
       s = animal.sl[0],
       f = s.f,
       groundDiff = sighthalfh - (f + 1);
@@ -407,7 +343,7 @@ function animalUpdate (animal) {
 
     if (groundDiff > 0) {
       // Gravity
-      animal.v[1] -= 0.15;
+      animal.v[1] -= 0.12;
     }
     else {
       // move up
@@ -424,12 +360,74 @@ function animalUpdate (animal) {
 
   animalSyncSight(animal);
 
+  //// Animal decision (each 500ms - 1s)
+
   var now = Date.now();
   if (now > animal.dt) {
     animal.dt = now + 500 + 500 * Math.random();
-    animalDecide(animal);
+
+    // TODO: calculate the center of animals & have more chance to try to reach it.
+    var r = Math.random();
+    if (r < 0.2) {
+      animal.t = 0.01 * (0.5-Math.random());
+    }
+    else if (r < 0.8) {
+      var d = animal.sr.a - animal.sl.a + 3 * Math.random();
+      animal.t = d>=0 ? 0.6 : -0.6;
+    }
+
+    var maxFireSee = sighthalfw;
+    var fire = 0;
+    for (i=0; i<maxFireSee; ++i) {
+      if (animal.sl[i] && animal.sl[i].e[2]) {
+        fire = -1;
+        break;
+      }
+      if (animal.sr[i] && animal.sr[i].e[2]) {
+        fire = 1;
+        break;
+      }
+    }
+    if (fire) {
+      animal.t = -1.2 * fire;
+    }
+
+    if (Math.random()<0.2) {
+      // Jump
+      var dir = 1;
+      animal.p[1] ++;
+      animal.v[0] = 1 * dir;
+      animal.v[1] = 1;
+    }
+
+    animalSyncSight(animal);
   }
-  animalMove(animal);
+
+  //// Animal apply move & check collision
+
+  if (groundDiff == 0) {
+    animal.v[0] = 0.4 * animal.t;
+  }
+
+  // TODO hit wall detection
+
+  var p = [ animal.p[0] + animal.v[0], animal.p[1] + animal.v[1] ];
+  if (groundDiff == 0) {
+    var dx = Math.floor(p[0]) - Math.floor(animal.p[0]);
+    if (dx) {
+      var s = dx > 0 ? animal.sr : animal.sl;
+      dx = Math.abs(dx);
+      if (s[dx] && s[dx].a) {
+        animal.p = p;
+      }
+    }
+    else {
+      animal.p = p;
+    }
+  }
+  else {
+    animal.p = p;
+  }
 }
 
 //////////////////////////////////////
@@ -644,9 +642,10 @@ function update () {
   if (now - lastRefreshWorld >= refreshWorldRate) {
     lastRefreshWorld = now;
     gl.readPixels(0, 0, worldSize[0], worldSize[1], gl.RGBA, gl.UNSIGNED_BYTE, worldPixelRawBuf);
+    parseColors(worldPixelRawBuf, worldPixelBuf);
+    worldRefreshTick ++;
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  parseColors(worldPixelRawBuf, worldPixelBuf);
 
   tick ++;
 }
