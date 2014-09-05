@@ -155,38 +155,47 @@ function posE (e) {
   return [ e.clientX, resolution[1] - e.clientY ];
 }
 
-document.addEventListener("keydown", function (e) {
+var keysDown = {};
+for (var i=0; i<999; ++i) keysDown[i]=0;
+
+
 //
 //       38
 //    37 40 39
-  var dx = 0, dy = 0;
-  switch (e.which) {
-    case 38: dy = 1; break;
-    case 40: dy = -1; break;
-    case 37: dx = -1; break;
-    case 39: dx = 1; break;
-  }
-  camera[0] += 8 * dx;
-  camera[1] += 8 * dy;
+//
+function handleKeys () {
+  var s = 6,
+      dx = keysDown[39]-keysDown[37],
+      dy = keysDown[38]-keysDown[40];
+  cameraV = [ s*dx, s*dy ];
+}
 
-  /*
-  if (e.keyCode == 86) drawObject = 4;
-  if (e.keyCode == 78) drawObject = 0;
-  if (e.keyCode == 83) drawObject = 5;
-  */
-  
-  if (dx || dy)
-    e.preventDefault();
+document.addEventListener("keyup", function (e) {
+  keysDown[e.which] = 0;
+  handleKeys();
 });
 
+document.addEventListener("keydown", function (e) {
+  var w = e.which;
+  keysDown[w] = 1;
+  if (37 <= w && w <= 40) {
+    e.preventDefault();
+  }
+  handleKeys();
+});
+
+///////// UTILS /////////////////////
+
+function ground (i) {
+  return i == 1 || i == 4 || i == 5;
+}
 
 /////////// ANIMAL ///////////////////
 
-var sightw = 24, sighth = 18;
-var sighthalfw = sightw / 2, sighthalfh = sighth / 2;
-
-var cliffFear = -4;
-var climb = 3;
+var sightw = 24,
+    sighth = 18,
+    sighthalfw = sightw / 2,
+    sighthalfh = sighth / 2;
 
 function Animal (initialPosition) {
   // p: position, t: targetted position
@@ -202,6 +211,11 @@ function Animal (initialPosition) {
   // this.d <- died flag
   // this.sl <- stats left
   // this.sr <- stats right
+  // this.h <- hash for caching the animalSyncSight
+}
+
+function animalIdx (x, y) {
+  return x + y * sightw;
 }
 
 // Animal functions
@@ -222,51 +236,34 @@ function animalSyncSight (animal) {
     }
   }
 
-  animalGenStats(animal);
-}
+  //////// Now Generate the Animal Stats ////////
 
-function animalIdx (x, y) {
-  return x + y * sightw;
-}
 
-function ground (i) {
-  return i == 1 || i == 4 || i == 5;
-}
-
-/*
-function canMoveSlope (fromY, toY) {
-  var dy = toY - fromY;
-  return toY !== -1 && toY != sighth && cliffFear <= dy && dy <= climb;
-}
-*/
-
-function animalSlopeX (animal, x, y) {
-  if (y == sighth) y--;
-  if (y == -1) y++;
-  while (y < sighth && ground(animal.b[x+y*sightw])) y++;
-  if (y < sighth) while (y >= 0 && !ground(animal.b[x+y*sightw])) y--;
-  return y;
-}
-
-/**
- * Stats:
- * sl & sr are 2 arrays of left & right exploration stats.
- * Each array:
- * f (floor): the position of a solid block (under the animal)
- * c (ceil): the position of the ceil on top of this solid block
- * h (height): ceil - floor - 1
- * s (slope): the slope in pixels – how much pixel to reach next tiles? (tiles because may be smoothed)
- * e (elements): count of elements in the [floor,ceil] range. (array with same indexes)
- *
- * size of the array: stops when the animal can't reach a place.
- */
-function animalGenStats (animal) {
+  /**
+   * Stats:
+   * sl & sr are 2 arrays of left & right exploration stats.
+   *
+   * Each array contains an object with:
+   * f (floor): the position of a solid block (under the animal)
+   * c (ceil): the position of the ceil on top of this solid block
+   * h (height): ceil - floor - 1
+   * s (slope): the slope in pixels – how much pixel to reach next pixels? (pixels because may be smoothed)
+   * e (elements): count of elements in the [floor,ceil] range. (array with same indexes)
+   * a (accessible): 1 if next pixel can be accessed. 0 otherwise
+   *
+   * The array also contains fields:
+   * a (accessible count): number of pixels that can be accessed
+   */
   function stats (dir) {
     var a, x, y, i, ret = [];
 
     var floors = [];
     for (x=sighthalfw, y=sighthalfh; 0<=x && x<sightw; x += dir) {
-      floors.push(y = animalSlopeX(animal, x, y));
+      if (y == sighth) y--;
+      if (y == -1) y++;
+      while (y < sighth && ground(animal.b[x+y*sightw])) y++;
+      if (y < sighth) while (y >= 0 && !ground(animal.b[x+y*sightw])) y--;
+      floors.push(y);
     }
 
     var countA = 0;
@@ -310,7 +307,7 @@ function animalGenStats (animal) {
  */
 function animalDie (animal, reason) {
   animal.d = 1;
-  console.log(animal, "die:", ["falls in a cliff","stuck in earth","burned by fire"][reason]);
+  console.log(["falls in a cliff","stuck in earth","burned by fire"][reason], animal);
 }
 
 function animalUpdate (animal) {
