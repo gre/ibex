@@ -619,7 +619,7 @@
         (1.0 + v - mix(vec2(0.0), v, pow(smoothstep(0.0, 0.5, time-T), 0.3))) + vec2(rand(gl_FragCoord.xy+time*0.03)-0.5, rand(gl_FragCoord.xy+time*0.1)-0.5) * mix(0.5, 2.0, pow(smoothstep(0.0, 1.0, time-T), 0.6))
         : vec2(0.0);
 
-      if (distance(p, pos) < 1.0) return vec4(1.0, 0.0, 0.0, 1.0); // DEBUG
+      // if (distance(p, pos) < 1.0) return vec4(1.0, 0.0, 0.0, 1.0); // DEBUG
 
       // The tile to use
       float tile = abs(v.x) < 0.1 ? 0.0 : 1.0 + floor(mod(pos.x / size, 3.0));

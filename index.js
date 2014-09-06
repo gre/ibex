@@ -42,7 +42,7 @@ var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
 var worldStartX = 0;
 
 var resolution;
-var zoom = 4;
+var zoom;
 var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
 var cameraV = [0, 0];
 var mouse = [ 0, 0 ];
@@ -267,6 +267,9 @@ function animalPixel (animal, x, y) {
 // I'm not doing prototype to save bytes (better limit the usage of fields which are hard to minimize)
 
 function animalSyncSight (animal) {
+  var h = worldRefreshTick+'_'+Math.floor(animal.x)+'_'+Math.floor(animal.y);
+  if (animal.h == h) return;
+  animal.h = h;
 
   /**
    * Stats:
@@ -536,6 +539,7 @@ function onResize () {
   ];
   C.width = resolution[0];
   C.height = resolution[1];
+  zoom = Math.floor(Math.max(2, Math.sqrt(C.width*C.height) / 160));
   gl.viewport(0, 0, C.width, C.height);
   var x1 = 0, y1 = 0, x2 = resolution[0], y2 = resolution[1];
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
@@ -797,7 +801,7 @@ function parseColors (bufin, bufout) {
     for (var c=0; c<colors.length; c += 3) {
       var diff = 0;
       for (var j=0; j<3; ++j) {
-        var d = colors[c + j] - (bufin[i+j]/256);
+        var d = colors[c + j] - (bufin[i + j]/256);
         diff += d * d;
       }
       if (diff < 0.001) break;
