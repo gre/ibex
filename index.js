@@ -1,14 +1,18 @@
 var seed = Math.random();
 Math.seedrandom(seed);
 
+var i, j;
 var C = document.createElement("canvas");
 
 // Game constants
 
+var tiles = new Image();
+tiles.src = "tiles.png";
+
 // in milliseconds
 var updateRate = 35;
 var refreshWorldRate = 200;
-var initialAnimals = 0;
+var initialAnimals = 20;
 
 var colors = [
   0.11, 0.16, 0.23, // 0: air
@@ -231,7 +235,7 @@ var sightw = 24,
     sighthalfw = sightw / 2,
     sighthalfh = sighth / 2;
 
-function Animal (initialPosition) {
+function Animal (initialPosition, size) {
   // p: position, t: targetted position
   this.p = initialPosition;
   this.t = 0;
@@ -241,10 +245,13 @@ function Animal (initialPosition) {
   this.b = new Uint8Array(sightw * sighth);
   // dt: next decision time
   this.dt = 0;
+  this.s = size;
 
   // this.d <- died flag
+  // this.T <- death time
   // this.sl <- stats left
   // this.sr <- stats right
+  // this.s <- size
   // this.h <- hash for caching the animalSyncSight
 }
 
@@ -299,7 +306,7 @@ function animalSyncSight (animal) {
       for (y=0; y<sighth; ++y) pixels[y] = animalPixel(animal, x, y);
 
       // Compute slope
-      s = ((y<sighth-1 ? floors[i+1] : f) + (y<sighth-2 ? floors[i+2] : f))/2 - f; // TODO smoothed version
+      s = ((i<sighthalfw-1 ? floors[i+1] : f) + (i<sighthalfw-2 ? floors[i+2] : f))/2 - f; // TODO smoothed version
       // Compute ceil
       for (c = f+1; c<sighth && !ground(pixels[c]); c++);
       // Compute height
@@ -328,7 +335,8 @@ function animalSyncSight (animal) {
  * 2: burned by fire
  */
 function animalDie (animal, reason) {
-  animal.d = 1;
+  animal.d = 1+reason;
+  animal.T = Date.now();
   console.log(["falls in a cliff","stuck in earth","burned by fire"][reason], animal);
 }
 
@@ -411,6 +419,7 @@ function animalUpdate (animal) {
       animal.t = -1.2 * fire;
     }
 
+    /*
     if (Math.random()<0.2) {
       // Jump
       var dir = 1;
@@ -418,6 +427,7 @@ function animalUpdate (animal) {
       animal.v[0] = 1 * dir;
       animal.v[1] = 1;
     }
+    */
 
     animalSyncSight(animal);
   }
@@ -488,9 +498,9 @@ var renderTimeL = gl.getUniformLocation(program, "time");
 var renderZoomL = gl.getUniformLocation(program, "zoom");
 var renderStateL = gl.getUniformLocation(program, "state");
 var renderWorldSizeL = gl.getUniformLocation(program, "worldSize");
-var renderAnimalsPL = gl.getUniformLocation(program, "animalsP");
-var renderAnimalsVL = gl.getUniformLocation(program, "animalsV");
+var renderAnimalsL = gl.getUniformLocation(program, "animals");
 var renderAnimalsLengthL = gl.getUniformLocation(program, "animalsLength");
+var renderAnimalsTilesL = gl.getUniformLocation(program, "tiles");
 var renderColorsL = gl.getUniformLocation(program, "colors");
 var renderDrawObjectL = gl.getUniformLocation(program, "drawObject");
 var renderDrawDragL = gl.getUniformLocation(program, "draggingElement");
@@ -501,6 +511,20 @@ var mouseL = gl.getUniformLocation(program, "mouse");
 var dragStartL = gl.getUniformLocation(program, "dragStart");
 var enableCursorL = gl.getUniformLocation(program, "enableCursor");
 var resolutionL = gl.getUniformLocation(program, "resolution");
+
+var texture = gl.createTexture();
+tiles.onload = function () {
+  gl.useProgram(renderProgram);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tiles);
+  gl.uniform1i(renderAnimalsTilesL, 1);
+  gl.activeTexture(gl.TEXTURE0);
+}
 
 gl.uniform1i(renderStateL, 0);
 gl.uniform3fv(renderColorsL, colors);
@@ -667,7 +691,7 @@ generate(0);
 for (i = 0; i < initialAnimals; ++i) {
   var x = Math.floor(50 + i * (5+4*Math.random()) + 50 * Math.random());
   var y = Math.floor(50 + 200 * Math.random());
-  var a = new Animal([ x, y ]);
+  var a = new Animal([ x, y ], 1);
   animals.push(a);
 }
 
@@ -710,21 +734,32 @@ function update () {
 
 (function render () {
   update();
-  for (var i=0; i<animals.length; ++i) {
+  for (var i=0; i<animals.length;) {
     var animal = animals[i];
     animalUpdate(animal);
+    if (animal.d && Date.now() - animal.T > 3000) {
+      animals.splice(i, 1);
+    }
+    else {
+      ++i;
+    }
   }
 
   setCam([ camera[0]+cameraV[0], camera[1]+cameraV[1] ]);
 
-  var animalPositions = [];
-  var animalVelocities = [];
+  var animalsData = [];
   for (var i=0; i<animals.length; ++i) {
     var animal = animals[i];
-    animalPositions.push(animal.p[0] - worldStartX);
-    animalPositions.push(animal.p[1]);
-    animalVelocities.push(animal.v[0]);
-    animalVelocities.push(animal.v[1]);
+    var statBack = animal.v[0] > 0 ? animal.sl : animal.sr;
+    var slope = statBack[0].f+1==sighthalfh && statBack[3].a ? statBack[0].f - statBack[3].f : 0;
+    animalsData.push(animal.p[0] - worldStartX);
+    animalsData.push(animal.p[1]);
+    animalsData.push(animal.v[0]);
+    animalsData.push(animal.v[1]);
+    animalsData.push(animal.s);
+    animalsData.push(animal.d);
+    animalsData.push((animal.T-start)/1000);
+    animalsData.push(slope);
   }
 
   var time = (Date.now()-start)/1000;
@@ -736,9 +771,8 @@ function update () {
   gl.uniform2fv(mouseL, mouse);
   if (dragStart) gl.uniform2fv(dragStartL, dragStart);
   gl.uniform1i(enableCursorL, !!dragStart && !dragCam);
-  if (animals.length) {
-    gl.uniform2fv(renderAnimalsPL, animalPositions);
-    gl.uniform2fv(renderAnimalsVL, animalVelocities);
+  if (animalsData.length) {
+    gl.uniform1fv(renderAnimalsL, animalsData);
   }
   gl.uniform1i(renderAnimalsLengthL, animals.length);
   gl.uniform1i(renderDrawDragL, draggingElement);
@@ -747,6 +781,7 @@ function update () {
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+
   requestAnimationFrame(render);
 }());
 

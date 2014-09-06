@@ -601,9 +601,9 @@
 
     uniform float time;
     uniform sampler2D state;
-    uniform vec2 animalsP[MAX_ANIMALS];
-    uniform vec2 animalsV[MAX_ANIMALS];
+    uniform float animals[8 * MAX_ANIMALS]; // array of [x, y, vx, vy, size, deathReason, deathTime, slope]
     uniform int animalsLength;
+    uniform sampler2D tiles;
 
     uniform bool draggingElement;
     uniform float drawRadius;
@@ -613,18 +613,39 @@
       return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
     }
 
-    vec4 animal (vec2 p, vec2 pos, vec2 vel, float size) {
-      // TODO: more sprites. handle cliff? walk? 
-      int x = int(floor(p.x - pos.x)), y = int(floor(p.y - pos.y));
-      if (vel.x > 0.0) x = -x;
-      if (
-        ((x == -1 || x == 1) && (y == 4 || y == 5)) ||
-        (x == 0 && (0 <= y && y <= 3)) ||
-        (x == 3 && (0 <= y && y <= 2)) ||
-        ((1 <= x && x <= 3) && y == 2)
-      )
-        return vec4(0.6, 0.4, 0.2, 1.0);
-      return vec4(0.0);
+    vec4 animal (vec2 p, vec2 pos, vec2 v, float size, float d, float T, float s) {
+      // Died displacement
+      vec2 disp = d>0.0 ?
+        (1.0 + v - mix(vec2(0.0), v, pow(smoothstep(0.0, 0.5, time-T), 0.3))) + vec2(rand(gl_FragCoord.xy+time*0.03)-0.5, rand(gl_FragCoord.xy+time*0.1)-0.5) * mix(0.5, 2.0, pow(smoothstep(0.0, 1.0, time-T), 0.6))
+        : vec2(0.0);
+
+      if (distance(p, pos) < 1.0) return vec4(1.0, 0.0, 0.0, 1.0); // DEBUG
+
+      // The tile to use
+      float tile = abs(v.x) < 0.1 ? 0.0 : 1.0 + floor(mod(pos.x / size, 3.0));
+
+      // pos: relative position & scaled to size
+      pos = (disp + p - pos) / size;
+      // Invert in X according to velocity
+      if (v.x > 0.0) pos.x = -pos.x;
+      // Slope deform the animal
+      float slope = /*pos.y >= 5.0 ? 0.0 :*/ clamp(s, -3., 3.) * smoothstep(0.0, 4.0, pos.x);
+      // Translate to the pivot
+      pos += vec2(3.5, slope);
+      // Scale to the tile width (to match the same pixel world dimension)
+      pos /= 8.0;
+
+      // When out of bound, return nothing
+      if (pos.x <= 0.0 || pos.y <= 0.0 || pos.x >= 1.0 || pos.y >= 1.0) return vec4(0.0);
+
+      // Compute the position from where to lookup in tiles
+      vec2 uv =
+        mix(
+          vec2(0.0, (1.0+tile) / 4.0), // uv to
+          vec2(1.0, tile / 4.0), // uv from
+          pos // the position
+        );
+      return texture2D(tiles, uv);
     }
     
     vec3 cursorColor (vec2 d) {
@@ -725,7 +746,19 @@
       if (!outOfBound) {
         vec4 animalsColor = vec4(0.0);
         for (int i=0; i<MAX_ANIMALS; ++i) { if (i >= animalsLength) break;
-          vec4 c = animal(statePos, animalsP[i], animalsV[i], 1.0);
+          vec4 c = animal(
+              statePos,
+              vec2(
+              animals[8*i+0],
+              animals[8*i+1]),
+              vec2(
+              animals[8*i+2],
+              animals[8*i+3]),
+              animals[8*i+4],
+              animals[8*i+5],
+              animals[8*i+6],
+              animals[8*i+7]);
+
           if (c.a > 0.0) {
             animalsColor = c;
             break;
