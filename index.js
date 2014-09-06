@@ -1,3 +1,5 @@
+setTimeout(function(){
+
 var seed = Math.random();
 
 var x, y, i, j;
@@ -966,3 +968,5 @@ function validateProg (program) {
    }
 }
 
+
+}, 500);

@@ -5,6 +5,7 @@ html,body {
   padding: 0;
   overflow: hidden;
   font-size: 2em;
-  font-family: monospace
+  font-family: monospace;
+  text-align: center;
 }
 
