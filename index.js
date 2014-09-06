@@ -31,7 +31,8 @@ var camAutoThreshold = 160;
 // Game states
 var tick = 0;
 var worldRefreshTick = 0;
-var worldSize = [ 256, 256 ];
+var worldWindow = 128; // The size of the world chunk window in X
+var worldSize = [ 2 * worldWindow, 256 ];
 var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
 var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
 var worldStartX = 0;
@@ -64,7 +65,7 @@ function posToWorld (p) {
 
 function setCam (c) {
   camera = [
-    c[0], //clamp(0, zoom * worldSize[0] - resolution[0], c[0]),
+    clamp(0, 128 + zoom * worldSize[0] - resolution[0], c[0]),
     clamp(0, 50+zoom * worldSize[1] - resolution[1], c[1])
   ];
 }
@@ -148,7 +149,7 @@ C.addEventListener("mousemove", function (e) {
     }
     else {
       var d = dist(dragStart, p);
-      if (d > 60) {
+      if (d > 0 * 60) {
         dragCam = [ camera[0] + dx, camera[1] + dy ];
         C.style.cursor = "move";
       }
@@ -617,7 +618,7 @@ function generate(startX) {
 }
 
 function rechunk (fromX, toX) {
-  update(1);
+  var newWorldStartX = worldStartX + fromX;
   var newWorldSize = [ toX-fromX, worldSize[1] ];
   var newWorldPixelRawBuf = new Uint8Array(newWorldSize[0] * newWorldSize[1] * 4);
   var newWorldPixelBuf = new Uint8Array(newWorldSize[0] * newWorldSize[1]);
@@ -631,13 +632,32 @@ function rechunk (fromX, toX) {
     }
   }
 
+  worldStartX = newWorldStartX;
   worldSize = newWorldSize;
   worldPixelRawBuf = newWorldPixelRawBuf;
   worldPixelBuf = newWorldPixelBuf;
-  worldStartX = fromX;
   generate(genStartX);
 
-  camera[0] -= zoom * fromX;
+  camera[0] -= fromX * zoom;
+  if (dragCam) dragCam[0] -= fromX * zoom;
+}
+
+function checkRechunk () {
+  var minX = worldStartX + camera[0] / zoom, maxX = worldStartX + (camera[0] + resolution[0]) / zoom;
+  for (var i=0; i<animals.length; ++i) {
+    minX = Math.min(animals[i].p[0], minX);
+    maxX = Math.max(animals[i].p[0], maxX);
+  }
+  var windowInf = Math.max(worldStartX, worldWindow * Math.floor(minX / worldWindow - 1));
+  var windowSup = Math.max(worldStartX + worldSize[0], worldWindow * Math.ceil(maxX / worldWindow + 1));
+
+  var fromX = Math.max(0, windowInf - worldStartX); // No going back
+  var toX = Math.max(worldSize[0], fromX + (windowSup - windowInf)); // No going back
+
+  if (fromX || (toX-fromX) - worldSize[0]) {
+    rechunk(fromX, toX);
+  }
+  
 }
 
 //////////// RUN THE GAME /////////////////
@@ -654,11 +674,15 @@ for (i = 0; i < initialAnimals; ++i) {
 var start = Date.now();
 var lastUpdate = 0;
 var lastRefreshWorld = 0; // Help the GPU to not spam request of "readPixels"
-function update (forceRead) {
+function update () {
   var now = Date.now();
-  if (!forceRead && now-lastUpdate < updateRate) return;
+  var needRead = now - lastRefreshWorld >= refreshWorldRate;
+  if (!needRead && now-lastUpdate < updateRate) return;
   lastUpdate = now;
   gl.useProgram(logicProgram);
+  if (needRead) {
+    checkRechunk();
+  }
   gl.uniform2fv(logicSizeL, worldSize);
   gl.uniform1f(logicTickL, tick);
   gl.uniform1i(logicDrawL, draw);
@@ -673,7 +697,7 @@ function update (forceRead) {
   gl.vertexAttribPointer(logicPositionL, 2, gl.FLOAT, gl.FALSE, 0, 0);
   gl.bindFramebuffer(gl.FRAMEBUFFER, logicFramebuffer);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-  if (forceRead || now - lastRefreshWorld >= refreshWorldRate) {
+  if (needRead) {
     lastRefreshWorld = now;
     gl.readPixels(0, 0, worldSize[0], worldSize[1], gl.RGBA, gl.UNSIGNED_BYTE, worldPixelRawBuf);
     parseColors(worldPixelRawBuf, worldPixelBuf);
