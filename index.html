@@ -814,6 +814,13 @@ float number (float n, vec2 p)
     }
     */
 
+    vec2 dispPass (float intensity, float amp, float speed) {
+      return intensity * vec2(
+        cos(speed*1.1*time+amp*0.9*gl_FragCoord.x+0.5),
+        sin(speed*time+amp*gl_FragCoord.y+0.1)
+      );
+    }
+
     vec4 stateColorPass (vec4 c, vec2 pos) {
       if (distance(c.rgb, colors[G]) < 0.01) {
         return c * mix(1.0, rand(pos), 0.2);
@@ -822,8 +829,8 @@ float number (float n, vec2 p)
     }
 
 
-    bool logo (vec2 pos, float size) {
-      vec2 p = (gl_FragCoord.xy - pos) / size;
+    bool logo (vec2 p, vec2 pos, float size) {
+      p = (p - pos) / size;
 
       return 0.0 < p.y && p.y < 1.0 && (
             
@@ -854,6 +861,30 @@ float number (float n, vec2 p)
       vec2 disp = brushDispPass(brushDist);
       */
       vec2 disp = vec2(0.0);
+
+      bool lgo = false;
+      float s;
+      vec2 logoP;
+      vec2 grad;
+
+      if (!started || gameover) {
+        if (gameover) {
+          s = 64.0;
+          logoP = vec2((resolution.x - 4.0 * s)/2.0, resolution.y - s * 1.4);
+        }
+        else {
+          s = 140.0;
+          logoP = (resolution-vec2(4.0 * s, s))/2.0;
+        }
+        grad = vec2(3.0*s, 1.6 * s);
+        if (logo(gl_FragCoord.xy, logoP, s)) {
+          lgo = true;
+        }
+      }
+      if (lgo) {
+        disp += dispPass(1.0, 0.1, 2.0);
+      }
+      
 
       // Compute where the camera/zoom is in the state texture
       vec2 statePos = (gl_FragCoord.xy + disp + camera) / zoom;
@@ -907,23 +938,16 @@ float number (float n, vec2 p)
       */
 
       if (!started || gameover) {
-        float s; vec2 logoP;
-        if (gameover) {
-          s = 64.0;
-          logoP = vec2((resolution.x - 4.0 * s)/2.0, resolution.y - s * 1.4);
+        if (lgo) {
+          c = 0.3 + 0.8*c;
+          if (!started && distance(resolution / 2.0 /  grad, mouse /  grad) < 0.6) {
+            c *= 1.4;
+          }
         }
-        else {
-          s = 140.0;
-          logoP = (resolution-vec2(4.0 * s, s))/2.0;
-        }
-        if (logo(logoP, s)) {
-          c = 0.3 + 0.7-c;
-        }
-        else if (logo(logoP+vec2(8.0, -8.0), s)) {
+        else if (logo(gl_FragCoord.xy, logoP+vec2(8.0, -8.0), s)) {
           c = vec3(0.0);
         }
         else {
-          vec2 grad = vec2(3.0*s, 1.6 * s);
           c = mix(c.rgb, vec3(0.0), 0.2 + 0.4 * smoothstep(0.4, 1.0, distance(resolution / 2.0 /  grad, gl_FragCoord.xy /  grad)));
         }
       }

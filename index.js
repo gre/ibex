@@ -90,11 +90,13 @@ function dist (a, b) {
 }
 
 var dragStart, dragCam, isValidDrag;
-resetMouse();
 function resetMouse () {
   dragStart = dragCam = isValidDrag = 0;
   C.style.cursor = "default";
+  if (!started)
+    C.style.cursor = "pointer";
 }
+resetMouse();
 
 function keyDraw () {
   var p = mouse;
@@ -165,7 +167,6 @@ C.addEventListener("mousedown", function (e) {
   drawRadius = 10;
 });
 
-C.style.cursor = "pointer";
 C.addEventListener("mouseup", function (e) {
   if (!started) start();
   var p = posE(e);
