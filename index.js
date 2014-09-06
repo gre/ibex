@@ -1,5 +1,4 @@
 var seed = Math.random();
-Math.seedrandom(seed);
 
 var i, j;
 var C = document.createElement("canvas");
@@ -533,13 +532,10 @@ gl.uniform1i(renderStateL, 0);
 gl.uniform3fv(renderColorsL, colors);
 
 function onResize () {
-  resolution = [
-    Math.max(600, window.innerWidth),
-    Math.max(400, window.innerHeight)
-  ];
+  resolution = [ window.innerWidth, window.innerHeight ];
   C.width = resolution[0];
   C.height = resolution[1];
-  zoom = Math.floor(Math.max(2, Math.sqrt(C.width*C.height) / 160));
+  zoom = Math.round(2 + C.height / 250);
   gl.viewport(0, 0, C.width, C.height);
   var x1 = 0, y1 = 0, x2 = resolution[0], y2 = resolution[1];
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
@@ -618,28 +614,72 @@ function affectColor (buf, i, c) {
 }
 
 function generate(startX) {
-  // TODO refactor with cellular automata
-  var i;
-  var perlin = generatePerlinNoise(worldSize[0], worldSize[1], 5, 0.1, 0.03);
-  for(i = 0; i < worldPixelBuf.length; i ++) {
-    var r = perlin[i];
-    var x = i % worldSize[0];
-    var y = Math.floor(i / worldSize[0]);
-    var e;
-    if (startX <= x) {
-      if (r < 0.25 + 0.6 * step(50, 0, y) - step(worldSize[1]-60, worldSize[1], y) || r > 0.7 - 0.4 * step(40, 0, y) + 0.2 * step(worldSize[1]-30, worldSize[1], y) ) {
-        e = 1;
+
+  var w = worldSize[0], h = worldSize[1];
+
+  function get (b, x, y) {
+    if (x >= 0 && x < w && y >= 0 && y < h) {
+      return b[x + y * w];
+    }
+    return y > 50 ? 1 : 0;
+  }
+
+  function set (b, x, y, e) {
+    if (x >= 0 && x < w && y >= 0 && y < h) {
+      b[x + y * w] = e;
+    }
+  }
+
+  var K = 30;
+
+  var x, y, i, k, e;
+  for (x = startX; x < worldSize[0]; ++x) {
+    for (y = 0; y < worldSize[1]; ++y) {
+      if (startX && x <= startX) {
+        // This try to make the world more seamless, not perfect yet.
+        e = ground(get(worldPixelBuf, startX-1, y)) ? 1 : 0;
       }
       else {
-        e = 0;
+        var r = Math.random();
+        e = +(r > 0.1 + 0.3 * (step(5, 50, y) + step(worldSize[1]-50, worldSize[1] - 2, y)));
       }
+      set(worldPixelBuf, x, y, e);
+    }
+  }
 
-      worldPixelBuf[i] = e;
+  var swp = new Uint8Array(worldPixelBuf);
+  var cur = worldPixelBuf;
+
+  for (k = 0; k < K; ++k) {
+
+    for (x = startX; x < worldSize[0]; ++x) {
+      for (y = 0; y < worldSize[1]; ++y) {
+        var me = get(cur, x, y);
+        var sum =
+          0.1 * me +
+          (0.9 + 0.1 * Math.random()) * get(cur, x-1, y-1) +
+          (0.9 + 0.1 * Math.random()) * get(cur, x, y-1) +
+          (0.9 + 0.1 * Math.random()) * get(cur, x+1, y-1) +
+          (1.4 + 0.2 * Math.random()) * get(cur, x-1, y) +
+          (1.1 + 0.2 * Math.random()) * get(cur, x+1, y) +
+          (1.6 - 0.1 * Math.random()) * get(cur, x-1, y+1) +
+          (1.2 - 0.2 * Math.random()) * get(cur, x, y+1) +
+          (1.0 - 0.1 * Math.random()) * get(cur, x+1, y+1);
+
+        var e = +(sum <= 6 + (Math.random()-0.5) * (1-k/K));
+        set(swp, x, y, e);
+      }
     }
-    else {
-      e = worldPixelBuf[i];
-    }
-    affectColor(worldPixelRawBuf, 4 * i, e);
+
+    var tmp = swp;
+    swp = cur;
+    cur = tmp;
+  }
+
+  if (swp === cur) worldPixelBuf = swp;
+
+  for (i = 0; i < worldPixelBuf.length; ++i) {
+    affectColor(worldPixelRawBuf, 4 * i, worldPixelBuf[i]);
   }
 
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, worldSize[0], worldSize[1], 0, gl.RGBA, gl.UNSIGNED_BYTE, worldPixelRawBuf);

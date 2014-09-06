@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>JS13K</title>
+  <title>IBEX</title>
   <link rel="stylesheet" href="index.css">
 </head>
 <body>
@@ -259,7 +259,9 @@
       ////// EARTH RULES ////
 
       if (prev == E) {
-        r = E;
+
+        if (!(get(-1, 0)==A && get(1, 0)==A)) // Hack to workaround with the bug in the terrain seamless
+          r = E;
 
         // Earth -> Source
         if (
@@ -616,7 +618,9 @@
     vec4 animal (vec2 p, vec2 pos, vec2 v, float size, float d, float T, float s) {
       // Died displacement
       vec2 disp = d>0.0 ?
-        (1.0 + v - mix(vec2(0.0), v, pow(smoothstep(0.0, 0.5, time-T), 0.3))) + vec2(rand(gl_FragCoord.xy+time*0.03)-0.5, rand(gl_FragCoord.xy+time*0.1)-0.5) * mix(0.5, 2.0, pow(smoothstep(0.0, 1.0, time-T), 0.6))
+        (1.0 + v - mix(vec2(0.0), v, pow(smoothstep(0.0, 0.5, time-T), 0.3))) +
+        vec2(rand(gl_FragCoord.xy+time*0.03)-0.5, rand(gl_FragCoord.xy+time*0.1)-0.5) *
+        mix(1., 8., pow(smoothstep(1.0, 6.0, time-T), 0.6))
         : vec2(0.0);
 
       // if (distance(p, pos) < 1.0) return vec4(1.0, 0.0, 0.0, 1.0); // DEBUG
@@ -645,7 +649,9 @@
           vec2(1.0, tile / 4.0), // uv from
           pos // the position
         );
-      return texture2D(tiles, uv);
+      vec4 clr = texture2D(tiles, uv);
+
+      return d>0.0 ? vec4(vec3(0.3 + 1.2 * length(clr.rgb), 0.2, 0.1), smoothstep(3.0, 1.5, time-T) * clr.a) : clr;
     }
     
     vec3 cursorColor (vec2 d) {
@@ -772,7 +778,6 @@
       gl_FragColor = vec4(c, 1.0);
     }
   </script>
-  <script src="seedrandom.min.js"></script>
   <script src="index.js"></script>
 </body>
 </html>

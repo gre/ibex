@@ -3,6 +3,9 @@ Game Goal
 - Protect & escort some wild animals into a safe place.
 - end of the world from left to right. rush to the right. infinite exploration.
 
+Implement game start & game end
+---
+
 Figure out the game play
 ---
 - ?? hold it to size it bigger.
@@ -10,9 +13,7 @@ Figure out the game play
 
 Make infinite exploration possible
 ---
- - grow when animal approaches
- - destroy from the left.
-  - accelerate the left destruction when width is high: trigger flames (bottom up fire drawing)
+- accelerate the left destruction when width is high: trigger flames (bottom up fire drawing)
 
 Implement animal graphics
 ---
