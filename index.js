@@ -8,7 +8,7 @@ var C = document.createElement("canvas");
 // in milliseconds
 var updateRate = 35;
 var refreshWorldRate = 200;
-var initialAnimals = 20;
+var initialAnimals = 0;
 
 var colors = [
   0.11, 0.16, 0.23, // 0: air
@@ -31,7 +31,7 @@ var camAutoThreshold = 160;
 // Game states
 var tick = 0;
 var worldRefreshTick = 0;
-var worldSize = [ 512, 256 ];
+var worldSize = [ 256, 256 ];
 var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
 var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
 var worldStartX = 0;
@@ -64,7 +64,7 @@ function posToWorld (p) {
 
 function setCam (c) {
   camera = [
-    clamp(0, zoom * worldSize[0] - resolution[0], c[0]),
+    c[0], //clamp(0, zoom * worldSize[0] - resolution[0], c[0]),
     clamp(0, 50+zoom * worldSize[1] - resolution[1], c[1])
   ];
 }
@@ -247,40 +247,18 @@ function Animal (initialPosition) {
   // this.h <- hash for caching the animalSyncSight
 }
 
-function animalIdx (animal, x, y) {
-  return x + y * sightw;
-
-  // TODO
-  var sx = Math.floor(animal.p[0] - sighthalfw);
-  var sy = Math.floor(animal.p[1] - sighthalfh);
-  return sx + (x-worldStartX) + (sy + y) * sightw;
+function animalPixel (animal, x, y) {
+  var sx = Math.floor(animal.p[0] - sighthalfw) + x - worldStartX;
+  if (sx < 0 || sx >= worldSize[0]) return 1;
+  var sy = Math.floor(animal.p[1] - sighthalfh) + y;
+  if (sy < 0 || sy >= worldSize[1]) return 1;
+  return worldPixelBuf[sx + sy * worldSize[0]];
 }
 
 // Animal functions
 // I'm not doing prototype to save bytes (better limit the usage of fields which are hard to minimize)
 
 function animalSyncSight (animal) {
-
-
-  animal.b = worldPixelBuf;
-  
-  // TODO OMG we shouldn't do this!!! directly query the world instead
-  // Cut the world buffer into the animal vision buffer
-  var sx = Math.floor(animal.p[0] - sighthalfw);
-  var sy = Math.floor(animal.p[1] - sighthalfh);
-  var hash = worldRefreshTick+'_'+sx+'_'+sy;
-  if (hash === animal.h) return;
-  animal.h = hash;
-  for (var x=0; x<sightw; ++x) {
-    for (var y=0; y<sighth; ++y) {
-      var wx = x + sx;
-      var wy = y + sy;
-      animal.b[x + y * sightw] = wx<0||wy<0||wx>=worldSize[0]||wy>=worldSize[1] ? 0 : worldPixelBuf[wx+wy*worldSize[0]];
-    }
-  }
-
-  //////// Now Generate the Animal Stats ////////
-
 
   /**
    * Stats:
@@ -304,8 +282,8 @@ function animalSyncSight (animal) {
     for (x=sighthalfw, y=sighthalfh; 0<=x && x<sightw; x += dir) {
       if (y == sighth) y--;
       if (y == -1) y++;
-      while (y < sighth && ground(animal.b[x+y*sightw])) y++;
-      if (y < sighth) while (y >= 0 && !ground(animal.b[x+y*sightw])) y--;
+      while (y < sighth && ground(animalPixel(animal, x, y))) y++;
+      if (y < sighth) while (y >= 0 && !ground(animalPixel(animal, x, y))) y--;
       floors.push(y);
     }
 
@@ -317,16 +295,16 @@ function animalSyncSight (animal) {
           s,
           e = [0,0,0,0,0,0,0,0,0];
       var pixels = new Uint8Array(sighth);
-      for (y=0; y<sighth; ++y) pixels[y] = animal.b[animalIdx(animal, x, y)];
+      for (y=0; y<sighth; ++y) pixels[y] = animalPixel(animal, x, y);
 
       // Compute slope
-      s = (floors[i+1]||f) - f; // TODO smoothed version
+      s = ((y<sighth-1 ? floors[i+1] : f) + (y<sighth-2 ? floors[i+2] : f))/2 - f; // TODO smoothed version
       // Compute ceil
       for (c = f+1; c<sighth && !ground(pixels[c]); c++);
       // Compute height
       h = c - f - 1;
       // Stop if conditions are reachable for the animal
-      if (h < 4 /* min height */ || Math.abs(s) > 4 /* max fall / climb */) {
+      if (h < 4 /* min height */ || Math.abs(s) > 3 /* max fall / climb */) {
         a = 0;
       }
       // Compute elements
@@ -365,7 +343,7 @@ function animalUpdate (animal) {
   // fire burns animal
   if (s.e[2]) {
     for (y=0; y<=5; ++y) {
-      if (animal.b[animalIdx(animal, sighthalfw, sighthalfh + y)] == 2) {
+      if (animalPixel(animal, sighthalfw, sighthalfh + y) == 2) {
         animalDie(animal, 2);
         break;
       }
@@ -524,7 +502,6 @@ var enableCursorL = gl.getUniformLocation(program, "enableCursor");
 var resolutionL = gl.getUniformLocation(program, "resolution");
 
 gl.uniform1i(renderStateL, 0);
-gl.uniform2fv(renderWorldSizeL, worldSize);
 gl.uniform3fv(renderColorsL, colors);
 
 function onResize () {
@@ -595,7 +572,6 @@ gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, log
 gl.useProgram(program);
 gl.uniform1f(logicSeedL, seed);
 gl.uniform1i(logicStateL, 0);
-gl.uniform2fv(logicSizeL, worldSize);
 gl.uniform3fv(logicColorsL, colors);
 
 var logicProgram = program;
@@ -613,43 +589,55 @@ function affectColor (buf, i, c) {
 }
 
 function generate(startX) {
+  // TODO refactor with cellular automata
   var i;
   var perlin = generatePerlinNoise(worldSize[0], worldSize[1], 5, 0.1, 0.03);
   for(i = 0; i < worldPixelBuf.length; i ++) {
     var r = perlin[i];
     var x = i % worldSize[0];
     var y = Math.floor(i / worldSize[0]);
+    var e;
     if (startX <= x) {
       if (r < 0.25 + 0.6 * step(50, 0, y) - step(worldSize[1]-60, worldSize[1], y) || r > 0.7 - 0.4 * step(40, 0, y) + 0.2 * step(worldSize[1]-30, worldSize[1], y) ) {
-        worldPixelBuf[i] = 1;
+        e = 1;
       }
       else {
-        worldPixelBuf[i] = 0;
+        e = 0;
       }
-    }
-  }
 
-  for(i = 0; i < worldPixelRawBuf.length; i += 4)
-    affectColor(worldPixelRawBuf, i, worldPixelBuf[i/4]);
+      worldPixelBuf[i] = e;
+    }
+    else {
+      e = worldPixelBuf[i];
+    }
+    affectColor(worldPixelRawBuf, 4 * i, e);
+  }
 
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, worldSize[0], worldSize[1], 0, gl.RGBA, gl.UNSIGNED_BYTE, worldPixelRawBuf);
 }
 
-function resize (fromX, toX) {
+function rechunk (fromX, toX) {
   update(1);
   var newWorldSize = [ toX-fromX, worldSize[1] ];
   var newWorldPixelRawBuf = new Uint8Array(newWorldSize[0] * newWorldSize[1] * 4);
   var newWorldPixelBuf = new Uint8Array(newWorldSize[0] * newWorldSize[1]);
+  var genStartX = worldSize[0] - fromX;
 
-  // TODO copy at the right place
+  for (var x=0; x < newWorldSize[0] && fromX + x < worldSize[0]; ++x) {
+    for (var y=0; y < newWorldSize[1]; ++y) {
+      var e = worldPixelBuf[fromX + x + y * (worldSize[0])];
+      var i = x + y * newWorldSize[0];
+      newWorldPixelBuf[i] = e;
+    }
+  }
 
   worldSize = newWorldSize;
   worldPixelRawBuf = newWorldPixelRawBuf;
   worldPixelBuf = newWorldPixelBuf;
   worldStartX = fromX;
-
-  var genStartX = toX - fromX;
   generate(genStartX);
+
+  camera[0] -= zoom * fromX;
 }
 
 //////////// RUN THE GAME /////////////////
@@ -671,8 +659,8 @@ function update (forceRead) {
   if (!forceRead && now-lastUpdate < updateRate) return;
   lastUpdate = now;
   gl.useProgram(logicProgram);
+  gl.uniform2fv(logicSizeL, worldSize);
   gl.uniform1f(logicTickL, tick);
-
   gl.uniform1i(logicDrawL, draw);
   if (draw) {
     draw = 0;
@@ -709,7 +697,7 @@ function update (forceRead) {
   var animalVelocities = [];
   for (var i=0; i<animals.length; ++i) {
     var animal = animals[i];
-    animalPositions.push(animal.p[0]);
+    animalPositions.push(animal.p[0] - worldStartX);
     animalPositions.push(animal.p[1]);
     animalVelocities.push(animal.v[0]);
     animalVelocities.push(animal.v[1]);
@@ -717,14 +705,17 @@ function update (forceRead) {
 
   var time = (Date.now()-start)/1000;
   gl.useProgram(renderProgram);
+  gl.uniform2fv(renderWorldSizeL, worldSize);
   gl.uniform1f(renderTimeL, time);
   gl.uniform1f(renderZoomL, zoom);
   gl.uniform2fv(cameraL, camera);
   gl.uniform2fv(mouseL, mouse);
   if (dragStart) gl.uniform2fv(dragStartL, dragStart);
   gl.uniform1i(enableCursorL, !!dragStart && !dragCam);
-  gl.uniform2fv(renderAnimalsPL, animalPositions);
-  gl.uniform2fv(renderAnimalsVL, animalVelocities);
+  if (animals.length) {
+    gl.uniform2fv(renderAnimalsPL, animalPositions);
+    gl.uniform2fv(renderAnimalsVL, animalVelocities);
+  }
   gl.uniform1i(renderAnimalsLengthL, animals.length);
   gl.uniform1i(renderDrawDragL, draggingElement);
   gl.uniform1f(renderDrawRadiusL, drawRadius);
