@@ -1,10 +1,13 @@
 var seed = Math.random();
 
-var i, j;
+var x, y, i, j;
 var C = document.createElement("canvas");
 
 // Game constants
 
+var started = 0;
+var gameover = 0;
+var score = 0;
 var tiles = new Image();
 tiles.src = "tiles.png";
 
@@ -32,6 +35,7 @@ var camAutoSpeed = 4;
 var camAutoThreshold = 160;
 
 // Game states
+
 var tick = 0;
 var worldRefreshTick = 0;
 var worldWindow = 128; // The size of the world chunk window in X
@@ -43,7 +47,7 @@ var worldStartX = 0;
 var resolution;
 var zoom;
 var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
-var cameraV = [0, 0];
+var cameraV = [0, 0 ];
 var mouse = [ 0, 0 ];
 
 var draw = 0;
@@ -83,32 +87,12 @@ function dist (a, b) {
   return Math.sqrt(dx*dx+dy*dy);
 }
 
-/*
-var dragStart;
-var mousedownTime;
-var dragCam;
-var isValidDrag;
-var autoScroll;
-
-function resetMouse (e) {
-  autoScroll = 0;
-  isValidDrag = 0;
-  dragCam = 0;
-  dragStart = 0;
-  draggingElement = 0;
-  cameraV = [0,0];
-  C.style.cursor = "default";
-}
-*/
 var dragStart, dragCam, isValidDrag;
-
+resetMouse();
 function resetMouse () {
   dragStart = dragCam = isValidDrag = 0;
-  cameraV = [0,0];
   C.style.cursor = "default";
 }
-
-resetMouse();
 
 function keyDraw () {
   var p = mouse;
@@ -179,7 +163,9 @@ C.addEventListener("mousedown", function (e) {
   drawRadius = 10;
 });
 
+C.style.cursor = "pointer";
 C.addEventListener("mouseup", function (e) {
+  if (!started) start();
   var p = posE(e);
   if (!dragCam && drawObject != -1) {
     draw = 1;
@@ -208,17 +194,20 @@ function handleKeys () {
 }
 
 document.addEventListener("keyup", function (e) {
-  keysDown[e.which] = 0;
-  handleKeys();
+  var w = e.which;
+  keysDown[w] = 0;
+  if (37 <= w && w <= 40 || w==87 || w==90 || w==88 || w==67 || w==86) {
+    handleKeys();
+  }
 });
 
 document.addEventListener("keydown", function (e) {
   var w = e.which;
   keysDown[w] = 1;
-  if (37 <= w && w <= 40/* || w==87 || w==90 || w==88 || w==67 || w==86*/) {
+  if (37 <= w && w <= 40 || w==87 || w==90 || w==88 || w==67 || w==86) {
     e.preventDefault();
+    handleKeys();
   }
-  handleKeys();
 });
 
 ///////// UTILS /////////////////////
@@ -234,7 +223,7 @@ var sightw = 24,
     sighthalfw = sightw / 2,
     sighthalfh = sighth / 2;
 
-function Animal (initialPosition, size) {
+function Animal (initialPosition, size, dt) {
   // p: position, t: targetted position
   this.p = initialPosition;
   this.t = 0;
@@ -243,7 +232,7 @@ function Animal (initialPosition, size) {
   // b: The buffer of the animal is its vision
   this.b = new Uint8Array(sightw * sighth);
   // dt: next decision time
-  this.dt = 0;
+  this.dt = dt;
   this.s = size;
 
   // this.d <- died flag
@@ -498,6 +487,9 @@ onResize();
 
 var renderTimeL = gl.getUniformLocation(program, "time");
 var renderZoomL = gl.getUniformLocation(program, "zoom");
+var renderStartedL = gl.getUniformLocation(program, "started");
+var renderGameOverL = gl.getUniformLocation(program, "gameover");
+var renderScoreL = gl.getUniformLocation(program, "score");
 var renderStateL = gl.getUniformLocation(program, "state");
 var renderWorldSizeL = gl.getUniformLocation(program, "worldSize");
 var renderAnimalsL = gl.getUniformLocation(program, "animals");
@@ -614,6 +606,8 @@ function affectColor (buf, i, c) {
 }
 
 function generate(startX) {
+
+  // This could be implemented in a 3rd shader for performance.
 
   var w = worldSize[0], h = worldSize[1];
 
@@ -732,17 +726,32 @@ function checkRechunk () {
 
 generate(0);
 
-for (i = 0; i < initialAnimals; ++i) {
-  var x = Math.floor(50 + i * (5+4*Math.random()) + 50 * Math.random());
-  var y = Math.floor(50 + 200 * Math.random());
-  var a = new Animal([ x, y ], 1);
-  animals.push(a);
+var tops = new Uint8Array(100);
+
+for (x=0; x<100; ++x) {
+  for (var y = worldSize[1]-1; y > 0; y--) {
+    if (ground(worldPixelBuf[x + y * worldSize[0]])) {
+      tops[x] = y;
+      break;
+    }
+  }
 }
 
-var start = Date.now();
+function init () {
+
+  for (i = 0; i < initialAnimals; ++i) {
+    var x = Math.floor(10 + 90 * Math.random());
+    var y = tops[x]+1;
+    var a = new Animal([ x, y ], 1, Date.now() + 2000 + 8000 * Math.random());
+    animals.push(a);
+  }
+}
+
+var startTime = Date.now();
 var lastUpdate = 0;
 var lastRefreshWorld = 0; // Help the GPU to not spam request of "readPixels"
 function update () {
+  if (tick && !started) return;
   var now = Date.now();
   var needRead = now - lastRefreshWorld >= refreshWorldRate;
   if (!needRead && now-lastUpdate < updateRate) return;
@@ -776,7 +785,8 @@ function update () {
   tick ++;
 }
 
-(function render () {
+function render () {
+  requestAnimationFrame(render);
   update();
   for (var i=0; i<animals.length;) {
     var animal = animals[i];
@@ -802,12 +812,13 @@ function update () {
     animalsData.push(animal.v[1]);
     animalsData.push(animal.s);
     animalsData.push(animal.d);
-    animalsData.push((animal.T-start)/1000);
+    animalsData.push((animal.T-startTime)/1000);
     animalsData.push(slope);
   }
 
-  var time = (Date.now()-start)/1000;
+  var time = (Date.now()-startTime)/1000;
   gl.useProgram(renderProgram);
+  gl.uniform2fv(resolutionL, resolution);
   gl.uniform2fv(renderWorldSizeL, worldSize);
   gl.uniform1f(renderTimeL, time);
   gl.uniform1f(renderZoomL, zoom);
@@ -815,6 +826,9 @@ function update () {
   gl.uniform2fv(mouseL, mouse);
   if (dragStart) gl.uniform2fv(dragStartL, dragStart);
   gl.uniform1i(enableCursorL, !!dragStart && !dragCam);
+  gl.uniform1i(renderStartedL, started);
+  gl.uniform1i(renderGameOverL, gameover);
+  gl.uniform1f(renderScoreL, score);
   if (animalsData.length) {
     gl.uniform1fv(renderAnimalsL, animalsData);
   }
@@ -825,12 +839,21 @@ function update () {
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-  requestAnimationFrame(render);
-}());
+};
 
 document.body.innerHTML = '';
 document.body.appendChild(C);
+
+render();
+
+function start () {
+  started = 1;
+  init();
+  cameraV[1] = 3;
+  setTimeout(function () {
+    cameraV[1] = 0;
+  }, 5000);
+}
 
 ///////////// UTILITIES ////////////////////
 
