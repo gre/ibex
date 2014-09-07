@@ -1,5 +1,3 @@
-setTimeout(function(){
-
 var x, y, i, j;
 
 ////// Game constants / states /////
@@ -1029,5 +1027,3 @@ function validateProg (program) {
    }
 }
 
-
-}, 300);

@@ -6,11 +6,11 @@
     "clean": "rm -rf build/; mkdir -p build",
     "cleanall": "rm -rf build/ target/; mkdir -p build target",
     "compileglsl": "glslmin src/shaders/logic.frag > build/logic.frag -s rand -s S_ -s main && glslmin src/shaders/render.frag > build/render.frag && glslmin src/shaders/logic.vert > build/logic.vert && glslmin src/shaders/render.vert > build/render.vert",
-    "tmpljs": "./wrap.sh build/render.frag FRAGMENT_RENDER >> build/build.js && ./wrap.sh build/render.vert VERTEX_RENDER >> build/build.js && ./wrap.sh build/logic.frag FRAGMENT_LOGIC >> build/build.js && ./wrap.sh build/logic.vert VERTEX_LOGIC >> build/build.js; cat src/index.js >> build/build.js",
-    "minify": "uglifyjs build/build.js -o build/build.min.js",
+    "tmpljs": " cat src/pre.js >> build/build.js; ./wrap.sh build/render.frag FRAGMENT_RENDER >> build/build.js && ./wrap.sh build/render.vert VERTEX_RENDER >> build/build.js && ./wrap.sh build/logic.frag FRAGMENT_LOGIC >> build/build.js && ./wrap.sh build/logic.vert VERTEX_LOGIC >> build/build.js; cat src/index.js >> build/build.js; cat src/post.js >> build/build.js",
+    "minify": "uglifyjs build/build.js -c --screw-ie8 -m -o build/build.min.js",
     "gen": "cp assets/tiles.png target/t.png && cp src/target.html target/index.html && cp build/build.min.js target/b.js",
     "build": "npm run cleanall && npm run compileglsl && npm run tmpljs && npm run minify && npm run gen",
-    "watch": "wr 'npm run build' src/"
+    "watch": "npm run build; wr 'npm run build' src/ assets/"
   },
   "repository": {
     "type": "git",
