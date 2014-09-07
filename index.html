@@ -595,8 +595,6 @@
 
     uniform vec3 colors[_];
 
-    uniform float offsets[4];
-
     uniform vec2 worldSize;
     uniform vec2 resolution;
 
@@ -872,31 +870,24 @@ float number (float n, vec2 p)
       );
     }
 
-    float offsetForElement (int e) {
-      if (e == 0) return offsets[0];
-      if (e == 1) return offsets[1];
-      if (e == 2) return offsets[2];
-      if (e == 3) return offsets[3];
-    }
-
     vec4 elementUI (vec3 clr) {
-      float radius = 40.;
+      float radius = 8. * zoom;
       float margin = 10.;
       float s = 2.*radius+margin;
-      vec2 size = vec2(2.*radius, 8.*radius + 3.*margin);
-      vec2 center = vec2(20., resolution.y / 2.0);
+      vec2 size = vec2(8.*radius + 3.*margin, 2.*radius);
+      vec2 center = vec2(resolution.x / 2.0, resolution.y / 4.0);
       vec2 origin = center - size / 2.;
       vec2 p = gl_FragCoord.xy - origin;
       if (p.x < 0.0 || p.x > size.x || p.y < 0.0 || p.y > size.y) return vec4(0.0);
-      float i = floor(p.y / s);
-      center = vec2(offsetForElement(int(i)), s * i) + vec2(radius);
+      float i = floor(p.x / s);
+      center = vec2(s * i, 0.0) + vec2(radius);
       float dist = distance(p, center);
       vec3 c = colorFor(int(i));
-      if (dist < radius - 6.0) {
+      if (dist < radius - zoom) {
         return vec4(c, 0.8);
       }
       if (dist < radius) {
-        return vec4(0.5 + 0.5 * c - 0.7 * clr, 1.0);
+        return vec4(0.2 + 0.3 * c - 0.7 * clr, 1.0);
       }
       return vec4(0.0);
     }
@@ -928,7 +919,7 @@ float number (float n, vec2 p)
         }
         else {
           s = 140.0;
-          logoP = (resolution-vec2(4.0 * s, s))/2.0;
+          logoP = (resolution-vec2(4.4 * s, s))/2.0;
         }
         grad = vec2(3.0*s, 1.6 * s);
         if (logo(gl_FragCoord.xy, logoP, s)) {
@@ -943,9 +934,12 @@ float number (float n, vec2 p)
         disp += dispPass(3.0 * pow(smoothstep(zoom * drawRadius, 0.0, distance(gl_FragCoord.xy, mouse)), 0.5), 0.2, 5.0);
       }
 
-      float uiMatchAlpha = elementUI(vec3(0.0)).a;
-      if (uiMatchAlpha > 0. && uiMatchAlpha <= 0.8) {
-        disp += dispPass(0.8, 0.2, 3.0);
+      float uiMatchAlpha = 0.0;
+      if (started && !gameover) {
+        uiMatchAlpha = elementUI(vec3(0.0)).a;
+        if (uiMatchAlpha > 0. && uiMatchAlpha <= 0.8) {
+          disp += dispPass(0.8, 0.2, 3.0);
+        }
       }
 
       // Compute where the camera/zoom is in the state texture
@@ -1021,7 +1015,13 @@ float number (float n, vec2 p)
         }
       }
 
-      if (number(score, (gl_FragCoord.xy/resolution.xy) * 128. * vec2(1,resolution.y/resolution.x)) > 0.0) {
+      vec2 scorePos = gl_FragCoord.xy;
+
+      if (gameover) {
+        scorePos -= (resolution - resolution / vec2(6.0, 36.0)) / 2.;
+      }
+
+      if (number(score, (scorePos/resolution.xy) * 128. * vec2(1,resolution.y/resolution.x)) > 0.0) {
         c = 0.2 + 0.8 * (1.0-c);
       }
       

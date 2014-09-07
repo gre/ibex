@@ -4,6 +4,8 @@ var x, y, i, j;
 
 ////// Game constants / states /////
 
+var uiBrushSize = 8;
+
 var seed = Math.random();
 var C = document.createElement("canvas");
 
@@ -55,7 +57,6 @@ var draggingElement = 0;
 var drawPosition;
 var drawObject;
 var drawRadius;
-var offsets = [0, 0, 0, 0];
 
 var animals = [];
 
@@ -74,7 +75,7 @@ function posToWorld (p) {
 function setCam (c) {
   camera = [
     clamp(0, 128 + zoom * worldSize[0] - resolution[0], c[0]),
-    clamp(0, 50+zoom * worldSize[1] - resolution[1], c[1])
+    clamp(-0.3 * resolution[1], 0.7 * resolution[1] + zoom * worldSize[1] - resolution[1], c[1])
   ];
 }
 
@@ -99,31 +100,44 @@ function resetMouse () {
 resetMouse();
 
 function uiElement (p) {
-  var size = 90;
-  if (p[0] < size) {
-    var uiP = (resolution[1] - 4*size) / 2;
-    var i = Math.floor((p[1]-uiP) / size);
+  var size = 10 + 2 * zoom * uiBrushSize;
+  var originY = resolution[1] / 4 - size / 2;
+  if (originY < p[1] && p[1] < originY + size) {
+    var uiP = (resolution[0] - 4*size) / 2;
+    var i = Math.floor((p[0]-uiP) / size);
     if (0 <= i && i < 4) {
       return i;
     }
   }
   return -1;
 }
+function uiElementCenterPos (i) {
+  var size = 10 + 2 * zoom * uiBrushSize;
+  var uiP = (resolution[0] - 4*size) / 2;
+  return [ uiP + size * (i + 0.5), resolution[1] / 4 ];
+}
 
 C.addEventListener("mouseleave", resetMouse);
 
 C.addEventListener("mousedown", function (e) {
   e.preventDefault();
+  if (!started || gameover) return;
   dragStart = posE(e);
   drawObject = uiElement(dragStart);
   dragCam = drawObject == -1 ? [].concat(camera) : 0;
-  if (!dragCam) drawRadius = 10;
+  if (!dragCam) drawRadius = uiBrushSize;
 });
 
 C.addEventListener("mouseup", function (e) {
   if (!started) start();
+  if (!started || gameover) return;
   var p = posE(e);
-  if (!dragCam && drawObject != -1) {
+  var i = uiElement(p);
+  if (i != -1 && drawObject == i) {
+    draw = 1;
+    drawPosition = posToWorld(uiElementCenterPos(i));
+  }
+  else if (!dragCam && drawObject != -1) {
     draw = 1;
     drawPosition = posToWorld(p);
   }
@@ -131,6 +145,7 @@ C.addEventListener("mouseup", function (e) {
 });
 
 C.addEventListener("mousemove", function (e) {
+  if (!started || gameover) return;
   var p = posE(e);
   mouse = p;
   var i = uiElement(p);
@@ -175,6 +190,7 @@ C.addEventListener("mousemove", function (e) {
 var keysDown = new Uint8Array(200); // we do that because nicely initialized to 0
 
 function keyDraw () {
+  if (!started || gameover) return;
   var p = mouse;
   if (keysDown[87]||keysDown[90]) {
     drawObject = 0;
@@ -528,7 +544,6 @@ var renderColorsL = gl.getUniformLocation(program, "colors");
 var renderDrawObjectL = gl.getUniformLocation(program, "drawObject");
 var renderDrawDragL = gl.getUniformLocation(program, "draggingElement");
 var renderDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
-var renderOffsetsL = gl.getUniformLocation(program, "offsets");
 
 var cameraL = gl.getUniformLocation(program, "camera");
 var mouseL = gl.getUniformLocation(program, "mouse");
@@ -666,7 +681,7 @@ function generate(startX) {
       }
       else {
         var r = Math.random();
-        e = +(r > 0.1 + 0.3 * (step(5, 50, y) + step(worldSize[1]-50, worldSize[1] - 2, y)));
+        e = +(r > -0.2 * step(100, 0, x + worldStartX) + 0.1 + 0.3 * (step(5, 50, y) + step(worldSize[1]-50, worldSize[1] - 2, y)));
       }
       set(worldPixelBuf, x, y, e);
     }
@@ -771,7 +786,7 @@ for (x=0; x<100; ++x) {
 function init () {
 
   for (i = 0; i < initialAnimals; ++i) {
-    var x = Math.floor(10 + 90 * Math.random());
+    var x = Math.floor(40 + 60 * Math.random());
     var y = tops[x]+1;
     var a = new Animal([ x, y ], 1, Date.now() + 2000 + 8000 * Math.random());
     animals.push(a);
@@ -816,18 +831,30 @@ function update () {
   tick ++;
 }
 
+var topScore = 0;
 function render () {
   requestAnimationFrame(render);
   update();
   for (var i=0; i<animals.length;) {
     var animal = animals[i];
     animalUpdate(animal);
+    if (!animal.d) {
+      topScore = Math.max(topScore, Math.floor(animal.p[0]));
+    }
     if (animal.d && Date.now() - animal.T > 3000) {
       animals.splice(i, 1);
     }
     else {
       ++i;
     }
+  }
+
+  score = score + 0.01*(topScore-score);
+
+  if (started && !animals.length) {
+    cameraV[0] = 1;
+    gameover = 1;
+    score = topScore;
   }
 
   setCam([ camera[0]+cameraV[0], camera[1]+cameraV[1] ]);
@@ -867,7 +894,6 @@ function render () {
   gl.uniform1i(renderDrawDragL, draggingElement);
   gl.uniform1f(renderDrawRadiusL, drawRadius);
   gl.uniform1i(renderDrawObjectL, drawObject);
-  gl.uniform1fv(renderOffsetsL, offsets);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -881,10 +907,15 @@ render();
 function start () {
   started = 1;
   init();
+
   cameraV[1] = 3;
-  setTimeout(function () {
-    cameraV[1] = 0;
-  }, 5000);
+  var camT = Date.now();
+  (function check () {
+    if (Date.now() - camT > 5000 || camera[1] + resolution[1] >= worldSize[1] * zoom) {
+      cameraV[1] = 0;
+    }
+    else setTimeout(check, 0);
+  }());
 }
 
 ///////////// UTILITIES ////////////////////
