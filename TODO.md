@@ -3,14 +3,6 @@ Game Goal
 - Protect & escort some wild animals into a safe place.
 - end of the world from left to right. rush to the right. infinite exploration.
 
-Implement game start & game end
----
-
-Figure out the game play
----
-- ?? hold it to size it bigger.
-- ?? cooldown
-
 Make infinite exploration possible
 ---
 - accelerate the left destruction when width is high: trigger flames (bottom up fire drawing)
@@ -32,12 +24,9 @@ AI motion have to be realist.
   - Water: nothing
   - Air: nothing
 
-Improve map generation
+Improve performance of map generation
 ---
-- Cellular Automata to generate the world
-  - Will save the need of perlin noise.
-  - http://www.roguebasin.com/index.php?title=Cellular_Automata_Method_for_Generating_Random_Cave-Like_Levels
-
+Should run in glsl ?
 
 Improve design
 ---
@@ -49,11 +38,6 @@ How to make the game more challenging
 
 - cooldown?
 - limited actions?
-
-Improve perfs
----
-
-Figure out bottlenecks?
 
 
 Mobile support?
