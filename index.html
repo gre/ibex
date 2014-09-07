@@ -74,6 +74,7 @@
     uniform float seed;
     uniform float tick;
     uniform sampler2D state;
+    uniform bool running;
 
     uniform bool draw;
     uniform ivec2 drawPosition;
@@ -555,6 +556,13 @@
           }
         }
       }
+
+      ///// SIMPLE ELEMENTS WHEN NOT RUNNING /////
+      if (!running) {
+        if (r == F || r == W|| r == G) r = A;
+        if (r == V || r == S) r = E;
+      }
+
       ///// Return the color result /////
 
       // r = int(grassDistrib(gl_FragCoord.xy) * 3.0); // for TEST
@@ -568,12 +576,9 @@
     attribute vec2 position; void main() { gl_Position = vec4(2.0*position-1.0, 0.0, 1.0);}
   </script>
   <script id="fragmentRender" type="x-shader/x-fragment">
-    #define AC(a) if(r==a)c=colors[a];
-    #define RtoC AC(0)AC(1)AC(2)AC(3)AC(4)AC(5)AC(6)AC(7)AC(8)
+    #define RetC(a) if(i==a)return colors[a];
 
     #define MAX_ANIMALS 20
-    #define UI_SIZE 64.
-    #define UI_LENGTH 4
 
     #define N 0
     #define E 1
@@ -590,7 +595,7 @@
 
     uniform vec3 colors[_];
 
-    //uniform int uiElements[UI_LENGTH];
+    uniform float offsets[4];
 
     uniform vec2 worldSize;
     uniform vec2 resolution;
@@ -598,7 +603,7 @@
     uniform float zoom;
     uniform vec2 camera;
     uniform vec2 mouse;
-    uniform vec2 dragStart;
+    //uniform vec2 dragStart;
     uniform bool enableCursor;
     uniform bool started;
     uniform bool gameover;
@@ -821,6 +826,18 @@ float number (float n, vec2 p)
       );
     }
 
+    vec3 colorFor (int i) {
+      RetC(0)
+      RetC(1)
+      RetC(2)
+      RetC(3)
+      RetC(4)
+      RetC(5)
+      RetC(6)
+      RetC(7)
+      RetC(8)
+    }
+
     vec4 stateColorPass (vec4 c, vec2 pos) {
       if (distance(c.rgb, colors[G]) < 0.01) {
         return c * mix(1.0, rand(pos), 0.2);
@@ -854,6 +871,42 @@ float number (float n, vec2 p)
 
       );
     }
+
+    float offsetForElement (int e) {
+      if (e == 0) return offsets[0];
+      if (e == 1) return offsets[1];
+      if (e == 2) return offsets[2];
+      if (e == 3) return offsets[3];
+    }
+
+    vec4 elementUI (vec3 clr) {
+      float radius = 40.;
+      float margin = 10.;
+      float s = 2.*radius+margin;
+      vec2 size = vec2(2.*radius, 8.*radius + 3.*margin);
+      vec2 center = vec2(20., resolution.y / 2.0);
+      vec2 origin = center - size / 2.;
+      vec2 p = gl_FragCoord.xy - origin;
+      if (p.x < 0.0 || p.x > size.x || p.y < 0.0 || p.y > size.y) return vec4(0.0);
+      float i = floor(p.y / s);
+      center = vec2(offsetForElement(int(i)), s * i) + vec2(radius);
+      float dist = distance(p, center);
+      vec3 c = colorFor(int(i));
+      if (dist < radius - 6.0) {
+        return vec4(c, 0.8);
+      }
+      if (dist < radius) {
+        return vec4(0.5 + 0.5 * c - 0.7 * clr, 1.0);
+      }
+      return vec4(0.0);
+    }
+
+    vec4 cursor (float dist, vec3 clr) {
+      if (dist < 1.0) {
+        return vec4(clr, 0.6);
+      }
+      return vec4(0.0);
+    }
     
     void main () {
       /*
@@ -866,6 +919,7 @@ float number (float n, vec2 p)
       float s;
       vec2 logoP;
       vec2 grad;
+      vec4 clr;
 
       if (!started || gameover) {
         if (gameover) {
@@ -884,7 +938,15 @@ float number (float n, vec2 p)
       if (lgo) {
         disp += dispPass(1.0, 0.1, 2.0);
       }
-      
+
+      if (enableCursor) {
+        disp += dispPass(3.0 * pow(smoothstep(zoom * drawRadius, 0.0, distance(gl_FragCoord.xy, mouse)), 0.5), 0.2, 5.0);
+      }
+
+      float uiMatchAlpha = elementUI(vec3(0.0)).a;
+      if (uiMatchAlpha > 0. && uiMatchAlpha <= 0.8) {
+        disp += dispPass(0.8, 0.2, 3.0);
+      }
 
       // Compute where the camera/zoom is in the state texture
       vec2 statePos = (gl_FragCoord.xy + disp + camera) / zoom;
@@ -904,8 +966,6 @@ float number (float n, vec2 p)
         rand(zoom*floor(gl_FragCoord.xy/zoom)+time/13.2)
       );
       vec3 pixelColor = -vec3(0.03) * (pixelPos.x - pixelPos.y);
-
-      // Bottleneck...
 
       if (!outOfBound) {
         vec4 animalsColor = vec4(0.0);
@@ -931,11 +991,20 @@ float number (float n, vec2 p)
         vec3 worldColor = c + noiseColor + pixelColor;
         c = animalsColor.a==0.0 ? worldColor : mix(worldColor, animalsColor.rgb, min(1.0, animalsColor.a));
       }
+
+      if (enableCursor) {
+        clr = cursor(distance(statePosFloor, floor((mouse + camera)/zoom)) / drawRadius, colorFor(drawObject));
+        c = mix(c.rgb, clr.rgb, clr.a);
+      }
       
       /*
       vec4 ui = UI2(c, distance(statePosFloor, floor((dragStart + camera)/zoom)) / drawRadius);
       c = mix(c.rgb, ui.rgb, ui.a);
       */
+      if (uiMatchAlpha > 0.0) {
+        clr = elementUI(c);
+        c = mix(c.rgb, clr.rgb, clr.a);
+      }
 
       if (!started || gameover) {
         if (lgo) {
