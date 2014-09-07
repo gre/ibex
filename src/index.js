@@ -774,6 +774,7 @@ function affectColor (buf, i, c) {
 }
 
 function generate (startX) {
+  var randTerrainAmount = 0.08 * Math.random() * Math.random();
 
   // This could be implemented in a 3rd shader for performance.
 
@@ -792,7 +793,7 @@ function generate (startX) {
     }
   }
 
-  var K = 30;
+  var K = 26;
 
   var x, y, i, k, e;
   for (x = startX; x < worldSize[0]; ++x) {
@@ -802,7 +803,7 @@ function generate (startX) {
         e = ground(get(worldPixelBuf, startX-1, y)) ? 1 : 0;
       }
       else {
-        e = +(Math.random() > -0.2 * step(100, 0, x + worldStartX) + 0.1 + 0.3 * (step(0, 25, y) + step(worldSize[1]-50, worldSize[1] - 2, y)));
+        e = +(Math.random() > -0.2 * step(100, 0, x + worldStartX) + 0.09 + randTerrainAmount + 0.3 * (step(0, 25, y) + step(worldSize[1]-50, worldSize[1] - 2, y)));
       }
       set(worldPixelBuf, x, y, e);
     }
