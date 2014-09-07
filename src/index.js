@@ -16,7 +16,7 @@ tiles.src = "t.png";
 // in milliseconds
 var updateRate = 35;
 var refreshWorldRate = 200;
-var initialAnimals = 20;
+var initialAnimals = 8;
 
 var colors = [
   0.11, 0.16, 0.23, // 0: air
@@ -91,9 +91,7 @@ var dragStart, dragCam, dragElement;
 
 function resetMouse () {
   dragStart = dragCam = 0;
-  C.style.cursor = "default";
-  if (!started)
-    C.style.cursor = "pointer";
+  C.style.cursor = started ? "default" : "pointer";
 }
 resetMouse();
 
@@ -156,23 +154,6 @@ C.addEventListener("mousemove", function (e) {
 
     if (dragCam) {
       setCam([ dragCam[0] - dx, dragCam[1] - dy ]);
-    }
-    else {
-      /*
-      var d = dist(dragStart, p);
-      if (d > 0 * 60) {
-        dragCam = [ camera[0] + dx, camera[1] + dy ];
-        C.style.cursor = "move";
-      }
-      if (d > 10) {
-        drawObject = 2 * (dy < 0) + (dx > 0);
-        C.style.cursor = "pointer";
-      }
-      else {
-        drawObject = -1;
-        C.style.cursor = "default";
-      }
-      */
     }
 
   }
@@ -261,7 +242,7 @@ function ground (i) {
 
 /////////// ANIMAL ///////////////////
 
-var sightw = 24,
+var sightw = 32,
     sighth = 18,
     sighthalfw = sightw / 2,
     sighthalfh = sighth / 2;
@@ -269,7 +250,7 @@ var sightw = 24,
 function Animal (initialPosition, size, dt) {
   // p: position, t: targetted position
   this.p = initialPosition;
-  this.t = 0;
+  this.t = [];
   // v: velocity
   this.v = [0, 0];
   // b: The buffer of the animal is its vision
@@ -298,7 +279,7 @@ function animalPixel (animal, x, y) {
 // I'm not doing prototype to save bytes (better limit the usage of fields which are hard to minimize)
 
 function animalSyncSight (animal) {
-  var h = worldRefreshTick+'_'+Math.floor(animal.x)+'_'+Math.floor(animal.y);
+  var h = worldRefreshTick+'_'+Math.floor(animal.p[0])+'_'+Math.floor(animal.p[1]);
   if (animal.h == h) return;
   animal.h = h;
 
@@ -312,6 +293,7 @@ function animalSyncSight (animal) {
    * h (height): ceil - floor - 1
    * s (slope): the slope in pixels – how much pixel to reach next pixels? (pixels because may be smoothed)
    * e (elements): count of elements in the [floor,ceil] range. (array with same indexes)
+   * v (elements viewable)
    * a (accessible): 1 if next pixel can be accessed. 0 otherwise
    *
    * The array also contains fields:
@@ -335,24 +317,26 @@ function animalSyncSight (animal) {
           c,
           h,
           s,
-          e = [0,0,0,0,0,0,0,0,0];
+          e = [0,0,0,0,0,0,0,0,0],
+          ve = [0,0,0,0,0,0,0,0,0];
       var pixels = new Uint8Array(sighth);
       for (y=0; y<sighth; ++y) pixels[y] = animalPixel(animal, x, y);
 
       // Compute slope
-      s = ((i<sighthalfw-1 ? floors[i+1] : f) + (i<sighthalfw-2 ? floors[i+2] : f))/2 - f; // TODO smoothed version
+      s = ((i<sighthalfw-1 ? floors[i+1] : f) + (i<sighthalfw-2 ? floors[i+2] : f))/2 - f;
       // Compute ceil
       for (c = f+1; c<sighth && !ground(pixels[c]); c++);
       // Compute height
       h = c - f - 1;
       // Stop if conditions are reachable for the animal
-      if (h < 4 /* min height */ || Math.abs(s) > 3 /* max fall / climb */) {
+      if (h < 4 /* min height */ || s < -3 || 3 < s /* max fall / climb */) {
         a = 0;
       }
       // Compute elements
       for (y=f; y<=c; ++y) e[pixels[y]] ++;
+      for (y=0; y<sighth; ++y) ve[pixels[y]] ++;
 
-      ret.push({f:f,c:c,h:h,s:s,e:e,a:a});
+      ret.push({f:f,c:c,h:h,s:s,e:e,v:ve,a:a});
       if (a) countA ++;
     }
     ret.a = countA;
@@ -374,7 +358,7 @@ function animalDie (animal, reason) {
   console.log(["falls in a cliff","stuck in earth","burned by fire"][reason], animal);
 }
 
-function animalUpdate (animal) {
+function animalUpdate (animal, center) {
   if (animal.d) return;
   animalSyncSight(animal);
 
@@ -421,12 +405,113 @@ function animalUpdate (animal) {
 
   animalSyncSight(animal);
 
-  //// Animal decision (each 500ms - 1s)
+
+  //////// Animal decision (each 500ms - 1s) ///////
 
   var now = Date.now();
-  if (now > animal.dt) {
+  if (animal.t.length==0 || now > animal.dt) {
+    if (now > animal.dt) {
+      //console.log("FORGET");
+      animal.t = []; // Forget the previous decision
+    }
+
+    // Next re-decision time
     animal.dt = now + 500 + 500 * Math.random();
 
+    // Is there fire nearby?
+    var fire = 0, fireDistance;
+    var maxFireSee = sighthalfw;
+    for (i=0; i<maxFireSee; ++i) {
+      if (animal.sl[i] && animal.sl[i].v[2]) {
+        fire = -1;
+        fireDistance = i;
+        break;
+      }
+      if (animal.sr[i] && animal.sr[i].v[2]) {
+        fire = 1;
+        fireDistance = i;
+        break;
+      }
+    }
+
+    // Distance with center of all animals
+    var deltaCenter = [ center[0] - animal.p[0], center[1] - animal.p[1] ];
+
+    // Cliff at right & following plateform?
+    var cliffRight = 0, cliffRightFollowedBySafePlatform;
+    var cliffRightLastPlatform, cliffRightAfterPlatform;
+    for (i=0; i<sighthalfw; ++i) {
+      var r = animal.sr[i];
+      if (!r.a) {
+        if (r.s < -3) { // select cliff only
+          cliffRight = 1;
+          cliffRightLastPlatform = [ i, r.f ];
+        }
+        break;
+      }
+    }
+    if (cliffRight) {
+      for (i=cliffRightLastPlatform[0]+2; i<sighthalfw; ++i) {
+        var r = animal.sr[i];
+        var dy = r.f - cliffRightLastPlatform[1];
+        if (Math.abs(dy) <= 3) { // valid jump conditions
+          if (r.h >= 4) { // safety conditions
+            cliffRightFollowedBySafePlatform = 1;
+            cliffRightAfterPlatform = [ i, r.f ];
+          }
+          break;
+        }
+      }
+    }
+
+    x = Math.floor(animal.p[0]);
+    y = Math.floor(animal.p[1]);
+
+    var decision = [];
+
+    // decision format:
+    // noop: ['n', time, _ ]
+    // walk: ['w', xVel, xEnd]
+    // run: ['r', xVel, xEnd]
+    // jump: ['j', xVel, yVel]
+
+    // TODO from new events, compute if or not the animal should reconsider previous decisions
+
+    if ((fire < 0 || !fire && Math.random() < 0.5) && cliffRight && cliffRightFollowedBySafePlatform) {
+      //console.log(animal);
+      //console.log(animal.p,":", cliffRightLastPlatform , "=>",  cliffRightAfterPlatform);
+
+      decision = [
+        "r", 0.7, x + cliffRightLastPlatform[0] - 1,
+        "j", 1, 1
+      ];
+
+    }
+
+    else if (fire) {
+      decision = [
+        "r", -1 * fire, x + (fire>=0 ? Math.max(animal.sr.a, 3) : -Math.max(animal.sl.a, 3))
+      ];
+    }
+
+    else {
+      var r = Math.random();
+      var d = Math.random() < 0.3 ? 1 : animal.sr.a - animal.sl.a + 3 * Math.random();
+      if (r < 0.7) {
+        decision = [
+          "w", (d>=0 ? 1 : -1) * 0.3, x + (d>=0 ? animal.sr.a-1 : -animal.sl.a+1)
+        ];
+      }
+      else {
+        decision = ["n", Date.now()+500, 0];
+      }
+    }
+
+    animal.t = animal.t.concat(decision); // append the decision
+
+    //console.log(animal.t);
+
+    /*
     // TODO: calculate the center of animals & have more chance to try to reach it.
     var r = Math.random();
     if (r < 0.2) {
@@ -453,6 +538,10 @@ function animalUpdate (animal) {
       animal.t = -1.2 * fire;
     }
 
+    var dir = animal.t > 0 ? animal.sr : animal.sl;
+
+    */
+
     /*
     if (Math.random()<0.2) {
       // Jump
@@ -468,11 +557,46 @@ function animalUpdate (animal) {
 
   //// Animal apply move & check collision
 
+  // TODO unfold decisions
+  // TODO compute the real velocity from the animal decision & the environnement
+
   if (groundDiff == 0) {
-    animal.v[0] = 0.4 * animal.t;
+    var i, c = 1; // continue?
+    for (i = 0; i<animal.t.length && c; i += 3) {
+      c = 0;
+      var action = animal.t[i];
+      var a = animal.t[i+1];
+      var b = animal.t[i+2];
+      if (action == 'n') {
+        if (Date.now() > a) {
+          c = 1;
+        }
+      }
+      if (action == 'w' || action == 'r') {
+        if (a > 0 && b <= animal.p[0] || a < 0 && b >= animal.p[0]) {
+          animal.v[0] = 0;
+          c = 1;
+        }
+        else {
+          animal.v[0] = a;
+        }
+      }
+      if (action == 'j') {
+        c = 1;
+        animal.p[1] ++;
+        animal.v = [a, b];
+      }
+      /*
+      if (c) {
+        console.log(action+" done", a, b);
+      }
+      */
+    }
+    if (!c) i -= 3;
+    if (i>0) animal.t.splice(0, i);
   }
 
-  // TODO hit wall detection
+  // TODO implement 2D collision detection (avoid animal being stuck)
 
   var p = [ animal.p[0] + animal.v[0], animal.p[1] + animal.v[1] ];
   if (groundDiff == 0) {
@@ -832,9 +956,16 @@ var topScore = 0;
 function render () {
   requestAnimationFrame(render);
   update();
+  var centerAnimals = [0,0];
+  for (var i=0; i<animals.length; i++) {
+    centerAnimals[0] += animals[i].p[0];
+    centerAnimals[1] += animals[i].p[1];
+  }
+  centerAnimals[0] /= animals.length;
+  centerAnimals[1] /= animals.length;
   for (var i=0; i<animals.length;) {
     var animal = animals[i];
-    animalUpdate(animal);
+    animalUpdate(animal, centerAnimals);
     if (!animal.d) {
       topScore = Math.max(topScore, Math.floor(animal.p[0]));
     }
@@ -1026,3 +1157,6 @@ function validateProg (program) {
    }
 }
 
+
+
+window.animals = animals;
