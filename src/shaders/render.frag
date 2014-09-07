@@ -414,7 +414,7 @@ void main () {
       c = vec3(0.0);
     }
     else {
-      c = mix(c.rgb, vec3(0.0), 0.2 + 0.4 * smoothstep(0.4, 1.0, distance(resolution / 2.0 /  grad, gl_FragCoord.xy /  grad)));
+      c = mix(c.rgb, vec3(0.0), (gameover ? 0.5 : 1.0) * (0.2 + 0.4 * smoothstep(0.4, 1.0, distance(resolution / 2.0 /  grad, gl_FragCoord.xy /  grad))));
     }
   }
 
@@ -425,7 +425,7 @@ void main () {
   }
 
   if (number(score, (scorePos/resolution.xy) * 128. * vec2(1,resolution.y/resolution.x)) > 0.0) {
-    c = 0.2 + 0.8 * (1.0-c);
+    c = 0.1 + 0.9 * (1.0-c);
   }
   
   gl_FragColor = vec4(c, 1.0);

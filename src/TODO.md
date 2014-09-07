@@ -1,19 +1,10 @@
 Game Goal
----
+===
 - Protect & escort some wild animals into a safe place.
 - end of the world from left to right. rush to the right. infinite exploration.
 
-Tooling
----
-
-Minify
-
-Make infinite exploration possible
----
-- accelerate the left destruction when width is high: trigger flames (bottom up fire drawing)
-
-Implement animal graphics
----
+Prioritized TODO list
+===
 
 Implement animal motion.
 ---
@@ -29,6 +20,13 @@ AI motion have to be realist.
   - Water: nothing
   - Air: nothing
 
+Implement animal graphics
+---
+
+Make infinite exploration possible
+---
+- accelerate the left destruction when width is high: trigger flames (bottom up fire drawing)
+
 Improve performance of map generation
 ---
 Should run in glsl ?
@@ -40,14 +38,16 @@ Improve design
 
 How to make the game more challenging
 ---
-
 - cooldown?
 - limited actions?
 
+General Performance & bugfix
+---
+
+Test the game on different plateform. Identify and fix bugs.
 
 Mobile support?
 ---
-
 
 ?? volcano particles
 ---

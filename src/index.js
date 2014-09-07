@@ -805,7 +805,7 @@ function update () {
   }
   gl.uniform2fv(logicSizeL, worldSize);
   gl.uniform1f(logicTickL, tick);
-  gl.uniform1i(logicRunningL, started && !gameover);
+  gl.uniform1i(logicRunningL, started);
   gl.uniform1i(logicDrawL, draw);
   if (draw) {
     draw = 0;

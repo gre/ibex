@@ -154,13 +154,12 @@ float grassDistrib (vec2 p) {
 
 void main () {
 
-  float x = gl_FragCoord.x;
-  float y = gl_FragCoord.y;
+  vec2 p = gl_FragCoord.xy;
   
   int prev = get(0, 0);
   int down = get(0, -1);
 
-  vec2 S_ = gl_FragCoord.xy + 0.001 * tick;
+  vec2 S_ = p + 0.001 * tick;
 
   bool prevIsSolid = prev==E||prev==G||prev==V||prev==S;
 
@@ -234,11 +233,11 @@ void main () {
   // Occasional rain
   float rainRelativeTime = mod(tick, 300.0);
   if (!prevIsSolid &&
-      y >= size[1]-1.0 &&
+      p.y >= size[1]-1.0 &&
       rainRelativeTime < 100.0) {
     float rainLgth = 100.0 * rand(vec2(seed + tick - rainRelativeTime));
     float rainStart = rand(vec2(seed*0.7 + tick - rainRelativeTime)) * (size[0]-rainLgth);
-    if (rainStart < x && x < rainStart+rainLgth)
+    if (rainStart < p.x && p.x < rainStart+rainLgth)
       r = W;
   }
 
@@ -298,7 +297,7 @@ void main () {
   }
 
   ////// Grass RULES ////
-  int grassMaxHeight = int(20.0 * pow(grassDistrib(gl_FragCoord.xy), 1.4));
+  int grassMaxHeight = int(20.0 * pow(grassDistrib(p), 1.4));
   if (grassMaxHeight > 0) {
     if (prev == G) {
       r = G;
@@ -398,12 +397,12 @@ void main () {
   // Occasional volcano
   float volcRelativeTime = mod(tick, 25.0);
   if (prevIsSolid &&
-      y <= 1.0 &&
+      p.y <= 1.0 &&
       RAND < 0.3 &&
       volcRelativeTime <= 1.0) {
     float volcLgth = 10.0 * rand(vec2(seed*0.07 + tick - volcRelativeTime));
     float volcStart = rand(vec2(seed*0.01 + tick - volcRelativeTime)) * (size[0]-volcLgth);
-    if (volcStart < x && x < volcStart+volcLgth)
+    if (volcStart < p.x && p.x < volcStart+volcLgth)
       r = V;
   }
 
@@ -518,7 +517,7 @@ void main () {
   //// DRAW //////
 
   if (draw) {
-    vec2 pos = floor(gl_FragCoord.xy);
+    vec2 pos = floor(p);
     if (distance(pos, vec2(drawPosition)) <= drawRadius) {
       if (drawObject == W) {
         if (prevIsSolid) {
