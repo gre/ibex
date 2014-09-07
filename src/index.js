@@ -13,7 +13,7 @@ var started = 0;
 var gameover = 0;
 var score = 0;
 var tiles = new Image();
-tiles.src = "tiles.png";
+tiles.src = "t.png";
 
 // in milliseconds
 var updateRate = 35;
