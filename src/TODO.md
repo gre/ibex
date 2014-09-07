@@ -3,6 +3,11 @@ Game Goal
 - Protect & escort some wild animals into a safe place.
 - end of the world from left to right. rush to the right. infinite exploration.
 
+Tooling
+---
+
+Minify
+
 Make infinite exploration possible
 ---
 - accelerate the left destruction when width is high: trigger flames (bottom up fire drawing)
