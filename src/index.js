@@ -649,7 +649,7 @@ function affectColor (buf, i, c) {
   buf[i+3] = 255;
 }
 
-function generate(startX) {
+function generate (startX) {
 
   // This could be implemented in a 3rd shader for performance.
 
@@ -678,8 +678,7 @@ function generate(startX) {
         e = ground(get(worldPixelBuf, startX-1, y)) ? 1 : 0;
       }
       else {
-        var r = Math.random();
-        e = +(r > -0.2 * step(100, 0, x + worldStartX) + 0.1 + 0.3 * (step(5, 50, y) + step(worldSize[1]-50, worldSize[1] - 2, y)));
+        e = +(Math.random() > -0.2 * step(100, 0, x + worldStartX) + 0.1 + 0.3 * (step(0, 25, y) + step(worldSize[1]-50, worldSize[1] - 2, y)));
       }
       set(worldPixelBuf, x, y, e);
     }

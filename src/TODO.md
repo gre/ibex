@@ -12,8 +12,9 @@ AI motion have to be realist.
 
 - Element actions on animal:
   - Fire: burn
-  - Water: slip
   - Air: push
+  - Forest: slow down? Reproduction?
+  - ?? Water: slip
 - Animal reactions when see element:
   - Fire: fear (move away)
   - Cliff: fear (stay)
@@ -30,6 +31,7 @@ Make infinite exploration possible
 Improve performance of map generation
 ---
 Should run in glsl ?
+More variety in generated terrains? (lot of air / lot of earth / a bit more forest)
 
 Improve design
 ---

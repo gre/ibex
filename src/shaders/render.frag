@@ -40,7 +40,6 @@ float rand(vec2 co){
 █       100
 ███     111
 */
-
 float c_0 = 31599.0;
 float c_1 = 9362.0;
 float c_2 = 29671.0;
@@ -52,70 +51,64 @@ float c_7 = 29257.0;
 float c_8 = 31727.0;
 float c_9 = 31695.0;
 
-float extract_bit(float n, float b)
-{
-n = floor(n);
-b = floor(b);
-b = floor(n/pow(2.,b));
-return float(mod(b,2.) == 1.);
-}
-float fpmod(vec2 p, float l)
-{
-p *= l;
-return mod(p.x + 257. + mod(p.y + 17. + mod(-p.y + 5. + mod(p.x + 3. , l),l),l),l);
+float extract_bit(float n, float b) {
+  n = floor(n);
+  b = floor(b);
+  b = floor(n/pow(2.,b));
+  return float(mod(b,2.) == 1.);
 }
 
-float sprite(float n, float w, float h, vec2 p)
-{
-float bounds = float(all(lessThan(p,vec2(w,h))) && all(greaterThanEqual(p,vec2(0,0))));
-return extract_bit(n,(2.0 - p.x) + 3.0 * p.y) * bounds;
+float fpmod(vec2 p, float l) {
+  p *= l;
+  return mod(p.x + 257. + mod(p.y + 17. + mod(-p.y + 5. + mod(p.x + 3. , l),l),l),l);
 }
 
-float bit_row(float bit, float scale, vec2 p)
-{
-float r = 0.;
-float bounds = 0.;
-for(int i = 0; i < 8; i++)
-{
-bounds = float(all(lessThan(p, vec2(scale, scale))) && all(greaterThanEqual(p, vec2(0,0))));	
-r += extract_bit(bit, float(i)) * bounds;
-p.x -= scale;
-}
-return r;
+float sprite(float n, float w, float h, vec2 p) {
+  float bounds = float(all(lessThan(p,vec2(w,h))) && all(greaterThanEqual(p,vec2(0,0))));
+  return extract_bit(n,(2.0 - p.x) + 3.0 * p.y) * bounds;
 }
 
-float digit(float num, vec2 p)
-{
-num = mod(floor(num),10.0);
-if(num == 0.0) return sprite(c_0, 3., 5., p);
-if(num == 1.0) return sprite(c_1, 3., 5., p);
-if(num == 2.0) return sprite(c_2, 3., 5., p);
-if(num == 3.0) return sprite(c_3, 3., 5., p);
-if(num == 4.0) return sprite(c_4, 3., 5., p);
-if(num == 5.0) return sprite(c_5, 3., 5., p);
-if(num == 6.0) return sprite(c_6, 3., 5., p);
-if(num == 7.0) return sprite(c_7, 3., 5., p);
-if(num == 8.0) return sprite(c_8, 3., 5., p);
-if(num == 9.0) return sprite(c_9, 3., 5., p);
-return 0.0;
+float bit_row(float bit, float scale, vec2 p) {
+  float r = 0.;
+  float bounds = 0.;
+  for(int i = 0; i < 8; i++) {
+    bounds = float(all(lessThan(p, vec2(scale, scale))) && all(greaterThanEqual(p, vec2(0,0))));	
+    r += extract_bit(bit, float(i)) * bounds;
+    p.x -= scale;
+  }
+  return r;
 }
 
-float number (float n, vec2 p)
-{
-float c = 0.;
-vec2 cpos = vec2(1,1);
-c += digit(n/100000.,floor(p-cpos));
-cpos.x += 4.;
-c += digit(n/10000.,floor(p-cpos));
-cpos.x += 4.;
-c += digit(n/1000.,floor(p-cpos));
-cpos.x += 4.;
-c += digit(n/100.,floor(p-cpos));
-cpos.x += 4.;
-c += digit(n/10.,floor(p-cpos));
-cpos.x += 4.;
-c += digit(n,floor(p-cpos));
-return c;
+float digit(float num, vec2 p) {
+  num = mod(floor(num),10.0);
+  if(num == 0.0) return sprite(c_0, 3., 5., p);
+  if(num == 1.0) return sprite(c_1, 3., 5., p);
+  if(num == 2.0) return sprite(c_2, 3., 5., p);
+  if(num == 3.0) return sprite(c_3, 3., 5., p);
+  if(num == 4.0) return sprite(c_4, 3., 5., p);
+  if(num == 5.0) return sprite(c_5, 3., 5., p);
+  if(num == 6.0) return sprite(c_6, 3., 5., p);
+  if(num == 7.0) return sprite(c_7, 3., 5., p);
+  if(num == 8.0) return sprite(c_8, 3., 5., p);
+  if(num == 9.0) return sprite(c_9, 3., 5., p);
+  return 0.0;
+}
+
+float number (float n, vec2 p) {
+  float c = 0.;
+  vec2 cpos = vec2(1,1);
+  c += digit(n/100000.,floor(p-cpos));
+  cpos.x += 4.;
+  c += digit(n/10000.,floor(p-cpos));
+  cpos.x += 4.;
+  c += digit(n/1000.,floor(p-cpos));
+  cpos.x += 4.;
+  c += digit(n/100.,floor(p-cpos));
+  cpos.x += 4.;
+  c += digit(n/10.,floor(p-cpos));
+  cpos.x += 4.;
+  c += digit(n,floor(p-cpos));
+  return c;
 }
 
 
@@ -157,73 +150,6 @@ vec4 animal (vec2 p, vec2 pos, vec2 v, float size, float d, float T, float s) {
 
   return d>0.0 ? vec4(vec3(0.3 + 1.2 * length(clr.rgb), 0.2, 0.1), smoothstep(3.0, 1.5, time-T) * clr.a) : clr;
 }
-
-/*
-vec3 cursorColor (vec2 d) {
-  if (drawObject == 0) return colors[0];
-  if (drawObject == 1) return colors[1];
-  if (drawObject == 2) return colors[2];
-  if (drawObject == 3) return colors[3];
-  if (d.x > 0.0 && d.y < 0.0)
-    return colors[0];
-  else if (d.x < 0.0 && d.y < 0.0)
-    return colors[1];
-  else if (d.x > 0.0 && d.y > 0.0)
-    return colors[2];
-  else
-    return colors[3];
-}
-*/
-
-/*
-int cursorElement (vec2 d) {
-  if (d.x > 0.0 && d.y < 0.0)
-    return 0;
-  else if (d.x < 0.0 && d.y < 0.0)
-    return 1;
-  else if (d.x > 0.0 && d.y > 0.0)
-    return 2;
-  else
-    return 3;
-}
-*/
-
-/*
-bool cursorElementHovered (vec2 d, float brushDist) {
-  if (!enableCursor) return false;
-  float l = length(d);
-  if (drawObject != -1) {
-    return brushDist < 1.0;
-  }
-  else {
-    float minDist = 4.0;
-    float maxDist = 40.0;
-    return minDist <= l && l <= maxDist && abs(d.x) > minDist && abs(d.y) > minDist;
-  }
-}
-
-vec4 UI2 (vec3 cin, float brushDist) {
-  if (enableCursor) {
-    vec2 d = dragStart - gl_FragCoord.xy;
-    if (cursorElementHovered(d, brushDist)) {
-      float mult = drawObject == -1 ? 1.3 : 1.2;
-      return mult * vec4(mix(cin, cursorColor(d), 0.6), 1.0);
-    }
-  }
-  return vec4(0.0);
-}
-
-vec2 brushDispPass (float brushDist) {
-  if (!enableCursor || drawObject == -1) return vec2(0.0);
-  float dispBrush = 4.0;
-  float dispBrushAmp = 0.1;
-  float dispBrushSpeed = 4.0;
-  return dispBrush * brushDist * vec2(
-    cos(dispBrushSpeed*1.1*time+dispBrushAmp*0.9*gl_FragCoord.x+0.5),
-    sin(dispBrushSpeed*time+dispBrushAmp*gl_FragCoord.y+0.1)
-  );
-}
-*/
 
 vec2 dispPass (float intensity, float amp, float speed) {
   return intensity * vec2(
@@ -405,7 +331,7 @@ void main () {
 
   if (!started || gameover) {
     if (lgo) {
-      c = 1.2 * (0.2 + 0.8*c);
+      c = 1.4 * (0.2 + 0.8*c);
       if (!started && distance(resolution / 2.0 /  grad, mouse /  grad) < 0.6) {
         c *= 1.2;
       }
