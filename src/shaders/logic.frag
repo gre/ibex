@@ -53,6 +53,7 @@ precision highp float;
 uniform vec2 size;
 uniform float seed;
 uniform float tick;
+uniform float tickStart;
 uniform sampler2D state;
 uniform bool running;
 
@@ -122,10 +123,11 @@ bool matchAll (mat3 pattern) {
   return matchAll(pattern, ivec2(0));
 }
 
+// FIXME TODO improve perfs !!!!
 bool matchAny (mat3 pattern) {
   return match(pattern) > 1;
 }
-bool matchOne (mat3 pattern) { // FIXME replace with "matchLeft, matchRight, matchTop, matchBottom" ?
+bool matchOne (mat3 pattern) { // FIXME remove / replace with "matchLeft, matchRight, matchTop, matchBottom" ?
   return matchAny(pattern);
 }
 
@@ -150,6 +152,17 @@ float grassDistrib (vec2 p) {
   0.5*(1.0+(cos(sin(p.y*0.01 + p.x * 0.05) + (1.0 + 0.3*sin(p.x*0.01)) * p.y * 0.08))),
   0.5
   );
+}
+
+bool hellTriggerPosition (vec2 p) {
+  if (tickStart==0.0) return false;
+  float hellTickStart = 0.0;
+  float hellTickInterv = 100.0;
+  float hellSize = 4.0;
+  float dt = tick - tickStart - hellTickStart;
+  float x = floor(dt / hellTickInterv);
+  float y = (dt - x * hellTickInterv);
+  return distance(hellSize * vec2(x, y), p) <= hellSize;
 }
 
 void main () {
@@ -183,7 +196,7 @@ void main () {
   }
 
   // Fire propagation: When fire met grass, fire can stay to continue to consume it
-  if (prev == F && RAND < 0.6 && matchAnyAdjacent(G)) {
+  if (prev == F && RAND < 0.8 && matchAnyAdjacent(G)) {
     r = F;
   }
 
@@ -538,6 +551,17 @@ void main () {
       else {
         r = drawObject;
       }
+    }
+  }
+
+  //// Hell /////
+
+  if (hellTriggerPosition(p)) {
+    if (prevIsSolid) {
+      r = V;
+    }
+    else {
+      r = F;
     }
   }
 

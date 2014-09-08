@@ -2,6 +2,7 @@ Game Goal
 ===
 - Protect & escort some wild animals into a safe place.
 - end of the world from left to right. rush to the right. infinite exploration.
+- Take some items?? need to have a goal to go downside
 
 Prioritized TODO list
 ===
@@ -20,6 +21,8 @@ AI motion have to be realist.
   - Cliff: fear (stay)
   - Water: nothing
   - Air: nothing
+
+- Animals counter
 
 Implement animal graphics
 ---
@@ -47,6 +50,10 @@ General Performance & bugfix
 ---
 
 Test the game on different plateform. Identify and fix bugs.
+
+- Load: (program) 6500ms
+- GPU: 257 Mo, 9.0 - 9.5 %
+
 
 Mobile support?
 ---

@@ -315,6 +315,8 @@ void main () {
     c = animalsColor.a==0.0 ? worldColor : mix(worldColor, animalsColor.rgb, min(1.0, animalsColor.a));
   }
 
+  c = mix(c, statePos.y < 0.0 ? colors[1] : colors[0], smoothstep(worldSize[0]-100.0, worldSize[0], statePos[0]));
+
   if (enableCursor) {
     clr = cursor(distance(statePosFloor, floor((mouse + camera)/zoom)) / drawRadius, colorFor(drawObject));
     c = mix(c.rgb, clr.rgb, clr.a);

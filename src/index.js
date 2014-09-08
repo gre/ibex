@@ -37,6 +37,7 @@ var camAutoSpeed = 4;
 var camAutoThreshold = 160;
 
 var tick = 0;
+var startTick = 0;
 var worldRefreshTick = 0;
 var worldWindow = 128; // The size of the world chunk window in X
 var worldSize = [ 2 * worldWindow, 256 ];
@@ -72,7 +73,7 @@ function posToWorld (p) {
 
 function setCam (c) {
   camera = [
-    clamp(0, 128 + zoom * worldSize[0] - resolution[0], c[0]),
+    clamp(0, zoom * worldSize[0] - resolution[0], c[0]),
     clamp(-0.3 * resolution[1], 0.7 * resolution[1] + zoom * worldSize[1] - resolution[1], c[1])
   ];
 }
@@ -393,6 +394,7 @@ function animalUpdate (animal, center) {
     else {
       // move up
       animal.p[1] -= groundDiff;
+      animal.v = [0,0];
     }
   }
   else {
@@ -417,6 +419,22 @@ function animalUpdate (animal, center) {
 
     // Next re-decision time
     animal.dt = now + 500 + 500 * Math.random();
+
+    // Is there water nearby?
+    var water = 0, waterDistance;
+    var maxWaterSee = sighthalfw;
+    for (i=0; i<maxWaterSee; ++i) {
+      if (animal.sl[i] && animal.sl[i].e[3]) {
+        water = -1;
+        waterDistance = i;
+        break;
+      }
+      if (animal.sr[i] && animal.sr[i].e[3]) {
+        water = 1;
+        waterDistance = i;
+        break;
+      }
+    }
 
     // Is there fire nearby?
     var fire = 0, fireDistance;
@@ -454,7 +472,7 @@ function animalUpdate (animal, center) {
       for (i=cliffRightLastPlatform[0]+2; i<sighthalfw; ++i) {
         var r = animal.sr[i];
         var dy = r.f - cliffRightLastPlatform[1];
-        if (Math.abs(dy) <= 3) { // valid jump conditions
+        if (Math.abs(dy) <= 5) { // valid jump conditions
           if (r.h >= 4) { // safety conditions
             cliffRightFollowedBySafePlatform = 1;
             cliffRightAfterPlatform = [ i, r.f ];
@@ -480,100 +498,68 @@ function animalUpdate (animal, center) {
     if ((fire < 0 || !fire && Math.random() < 0.5) && cliffRight && cliffRightFollowedBySafePlatform) {
       //console.log(animal);
       //console.log(animal.p,":", cliffRightLastPlatform , "=>",  cliffRightAfterPlatform);
+      /*
+      var vx = 0.2 + 0.12 * (cliffRightAfterPlatform[0] - cliffRightLastPlatform[0]);
+      var vy = 0.2 + 0.12 * (cliffRightAfterPlatform[1] - cliffRightLastPlatform[1]);
+      */
+      var vx = 0.1 + 0.08 * (cliffRightAfterPlatform[0] - cliffRightLastPlatform[0]), vy = 1;
 
       decision = [
         "r", 0.7, x + cliffRightLastPlatform[0] - 1,
-        "j", 1, 1
+        "j", vx, vy,
+        "n", 500, 0
       ];
 
     }
 
     else if (fire) {
       decision = [
-        "r", -1 * fire, x + (fire>=0 ? Math.max(animal.sr.a, 3) : -Math.max(animal.sl.a, 3))
+        "r", -1 * fire, x + (fire<0 ? 30 : -30) + 10 * (0.5-Math.random()),
+        "w", -0.5 * fire, x + (fire<0 ? 50 : -50) + 10 * (0.5-Math.random())
       ];
     }
 
     else {
       var r = Math.random();
-      var d = Math.random() < 0.3 ? 1 : animal.sr.a - animal.sl.a + 3 * Math.random();
-      if (r < 0.7) {
+      var d =
+        Math.random() < 0.1 ? animal.sr.a - animal.sl.a :
+        water && waterDistance < 5 && Math.random()<0.5 ? water :
+        Math.random()<0.3 && Math.abs(deltaCenter[0])>50 ? deltaCenter[0] :
+        1
+        ;
+      if (r < 0.7 || water && waterDistance < 5) {
         decision = [
           "w", (d>=0 ? 1 : -1) * 0.3, x + (d>=0 ? animal.sr.a-1 : -animal.sl.a+1)
         ];
       }
       else {
-        decision = ["n", Date.now()+500, 0];
+        decision = ["n", 500, 0];
       }
     }
 
     animal.t = animal.t.concat(decision); // append the decision
-
-    //console.log(animal.t);
-
-    /*
-    // TODO: calculate the center of animals & have more chance to try to reach it.
-    var r = Math.random();
-    if (r < 0.2) {
-      animal.t = 0.01 * (0.5-Math.random());
-    }
-    else if (r < 0.8) {
-      var d = animal.sr.a - animal.sl.a + 3 * Math.random();
-      animal.t = d>=0 ? 0.6 : -0.6;
-    }
-
-    var maxFireSee = sighthalfw;
-    var fire = 0;
-    for (i=0; i<maxFireSee; ++i) {
-      if (animal.sl[i] && animal.sl[i].e[2]) {
-        fire = -1;
-        break;
-      }
-      if (animal.sr[i] && animal.sr[i].e[2]) {
-        fire = 1;
-        break;
-      }
-    }
-    if (fire) {
-      animal.t = -1.2 * fire;
-    }
-
-    var dir = animal.t > 0 ? animal.sr : animal.sl;
-
-    */
-
-    /*
-    if (Math.random()<0.2) {
-      // Jump
-      var dir = 1;
-      animal.p[1] ++;
-      animal.v[0] = 1 * dir;
-      animal.v[1] = 1;
-    }
-    */
-
-    animalSyncSight(animal);
   }
 
   //// Animal apply move & check collision
 
   // TODO unfold decisions
-  // TODO compute the real velocity from the animal decision & the environnement
 
   if (groundDiff == 0) {
-    var i, c = 1; // continue?
+    var i, c = 1;
     for (i = 0; i<animal.t.length && c; i += 3) {
       c = 0;
       var action = animal.t[i];
       var a = animal.t[i+1];
       var b = animal.t[i+2];
       if (action == 'n') {
-        if (Date.now() > a) {
+        if (!b) b = animal.t[i+2] = Date.now() + a;
+        if (Date.now() > b) {
           c = 1;
         }
       }
       if (action == 'w' || action == 'r') {
-        if (a > 0 && b <= animal.p[0] || a < 0 && b >= animal.p[0]) {
+        var dirS = a < 0 ? animal.sl : animal.sr;
+        if (!dirS[0].a || a > 0 && b <= animal.p[0] || a < 0 && b >= animal.p[0]) {
           animal.v[0] = 0;
           c = 1;
         }
@@ -596,9 +582,29 @@ function animalUpdate (animal, center) {
     if (i>0) animal.t.splice(0, i);
   }
 
-  // TODO implement 2D collision detection (avoid animal being stuck)
+  animalSyncSight(animal);
 
-  var p = [ animal.p[0] + animal.v[0], animal.p[1] + animal.v[1] ];
+  // TODO apply the real velocity from the environnement
+  var v = [].concat(animal.v);
+  var els = animal.sl[0].e;
+  if (v[0]) {
+    var add = [0,0];
+    var friction = 1;
+    var wind = els[7] - els[6];
+    if (wind > 3) add[0] += 0.1;
+    if (wind < 3) add[0] -= 0.1;
+    if (groundDiff==0) {
+      friction *= 1 - 0.2 * step(0, 3, els[8]);
+      friction *= 1 - 0.5 * step(0, 3, els[3]);
+    }
+    v[0] += add[0];
+    v[1] += add[1];
+    v[0] *= friction;
+    v[1] *= friction;
+  }
+
+  // TODO implement 2D collision detection (avoid animal being stuck)
+  var p = [ animal.p[0] + v[0], animal.p[1] + v[1] ];
   if (groundDiff == 0) {
     var dx = Math.floor(p[0]) - Math.floor(animal.p[0]);
     if (dx) {
@@ -732,6 +738,7 @@ validateProg(program);
 var logicSeedL = gl.getUniformLocation(program, "seed");
 var logicRunningL = gl.getUniformLocation(program, "running");
 var logicTickL = gl.getUniformLocation(program, "tick");
+var logicStartTickL = gl.getUniformLocation(program, "tickStart");
 var logicColorsL = gl.getUniformLocation(program, "colors");
 var logicStateL = gl.getUniformLocation(program, "state");
 var logicSizeL = gl.getUniformLocation(program, "size");
@@ -775,6 +782,7 @@ function affectColor (buf, i, c) {
 
 function generate (startX) {
   var randTerrainAmount = 0.08 * Math.random() * Math.random();
+  var randTerrainDown = 100 * Math.random() * Math.random();
 
   // This could be implemented in a 3rd shader for performance.
 
@@ -803,7 +811,7 @@ function generate (startX) {
         e = ground(get(worldPixelBuf, startX-1, y)) ? 1 : 0;
       }
       else {
-        e = +(Math.random() > -0.2 * step(100, 0, x + worldStartX) + 0.09 + randTerrainAmount + 0.3 * (step(0, 25, y) + step(worldSize[1]-50, worldSize[1] - 2, y)));
+        e = +(Math.random() > -0.2 * step(100, 0, x + worldStartX) + 0.09 + randTerrainAmount + 0.3 * (step(0, 25, y) + step(worldSize[1]-50-randTerrainDown, worldSize[1] - 2 - 0.2 * randTerrainDown, y)));
       }
       set(worldPixelBuf, x, y, e);
     }
@@ -873,10 +881,17 @@ function rechunk (fromX, toX) {
 }
 
 function checkRechunk () {
-  var minX = worldStartX + camera[0] / zoom, maxX = worldStartX + (camera[0] + resolution[0]) / zoom;
-  for (var i=0; i<animals.length; ++i) {
-    minX = Math.min(animals[i].p[0], minX);
-    maxX = Math.max(animals[i].p[0], maxX);
+  var minX, maxX;
+  if (animals.length == 0) {
+    minX = worldStartX + camera[0] / zoom;
+    maxX = worldStartX + (camera[0] + resolution[0]) / zoom;
+  }
+  else {
+    var minX = animals[0].p[0], maxX = minX;
+    for (var i=0; i<animals.length; ++i) {
+      minX = Math.min(animals[i].p[0], minX);
+      maxX = Math.max(animals[i].p[0], maxX);
+    }
   }
   var windowInf = Math.max(worldStartX, worldWindow * Math.floor(minX / worldWindow - 1));
   var windowSup = Math.max(worldStartX + worldSize[0], worldWindow * Math.ceil(maxX / worldWindow + 1));
@@ -929,6 +944,7 @@ function update () {
   }
   gl.uniform2fv(logicSizeL, worldSize);
   gl.uniform1f(logicTickL, tick);
+  gl.uniform1f(logicStartTickL, startTick);
   gl.uniform1i(logicRunningL, started);
   gl.uniform1i(logicDrawL, draw);
   if (draw) {
@@ -1042,6 +1058,7 @@ function start () {
   (function check () {
     if (Date.now() - camT > 5000 || camera[1] + resolution[1] >= worldSize[1] * zoom) {
       cameraV[1] = 0;
+      startTick = tick;
     }
     else setTimeout(check, 0);
   }());
