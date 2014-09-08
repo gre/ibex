@@ -55,7 +55,8 @@ var draw = 0;
 var draggingElement = 0;
 var drawPosition;
 var drawObject;
-var drawRadius;
+var drawRadius = uiBrushSize;
+var buttons = [0,0,0,0];
 
 var animals = [];
 
@@ -73,7 +74,7 @@ function posToWorld (p) {
 
 function setCam (c) {
   camera = [
-    clamp(0, zoom * worldSize[0] - resolution[0], c[0]),
+    clamp(-resolution[0]/2, resolution[0]/2+ zoom * worldSize[0] - resolution[0], c[0]),
     clamp(-0.3 * resolution[1], 0.7 * resolution[1] + zoom * worldSize[1] - resolution[1], c[1])
   ];
 }
@@ -116,7 +117,7 @@ C.addEventListener("mousedown", function (e) {
   dragStart = posE(e);
   drawObject = uiElement(dragStart);
   dragCam = drawObject == -1 ? [].concat(camera) : 0;
-  if (!dragCam) drawRadius = uiBrushSize;
+  //if (!dragCam) drawRadius = uiBrushSize;
 });
 
 C.addEventListener("mouseup", function (e) {
@@ -128,9 +129,14 @@ C.addEventListener("mouseup", function (e) {
     draw = 1;
     drawPosition = posToWorld(uiElementCenterPos(i));
   }
+  /*
   else if (!dragCam && drawObject != -1) {
     draw = 1;
     drawPosition = posToWorld(p);
+  }
+  */
+
+  if (!dragCam) {
   }
   resetMouse();
 });
@@ -152,9 +158,6 @@ C.addEventListener("mousemove", function (e) {
     }
 
   }
-  else {
-    keyDraw();
-  }
 });
 
 
@@ -165,38 +168,30 @@ var keysDown = new Uint8Array(200); // we do that because nicely initialized to 
 
 function keyDraw () {
   if (!started || gameover) return;
-  var p = mouse;
   if (keysDown[87]||keysDown[90]) {
     drawObject = 0;
-    if (!dragStart) {
-      draw = 1;
-      drawPosition = posToWorld(p);
-      drawRadius = 6;
-    }
+    draw = 1;
   }
   else if (keysDown[88]) {
     drawObject = 1;
-    if (!dragStart) {
-      draw = 1;
-      drawPosition = posToWorld(p);
-      drawRadius = 6;
-    }
+    draw = 1;
   }
   else if (keysDown[67]) {
     drawObject = 2;
-    if (!dragStart) {
-      draw = 1;
-      drawPosition = posToWorld(p);
-      drawRadius = 4;
-    }
+    draw = 1;
   }
   else if (keysDown[86]) {
     drawObject = 3;
-    if (!dragStart) {
-      draw = 1;
-      drawPosition = posToWorld(p);
-      drawRadius = 4;
-    }
+    draw = 1;
+  }
+  console.log(dragStart, dragCam, drawObject);
+  if (!draw && dragStart && !dragCam) {
+    draw = 1;
+    drawPosition = posToWorld(uiElementCenterPos(drawObject));
+  }
+  if (draw) {
+    drawPosition = posToWorld(uiElementCenterPos(drawObject));
+    drawRadius = uiBrushSize;
   }
 }
 
@@ -209,7 +204,6 @@ function handleKeys () {
       dx = keysDown[39]-keysDown[37],
       dy = keysDown[38]-keysDown[40];
   cameraV = [ s*dx, s*dy ];
-  keyDraw();
 }
 
 document.addEventListener("keyup", function (e) {
@@ -658,7 +652,7 @@ var renderDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
 
 var cameraL = gl.getUniformLocation(program, "camera");
 var mouseL = gl.getUniformLocation(program, "mouse");
-var enableCursorL = gl.getUniformLocation(program, "enableCursor");
+var drawingL = gl.getUniformLocation(program, "drawing");
 var resolutionL = gl.getUniformLocation(program, "resolution");
 
 var texture = gl.createTexture();
@@ -950,6 +944,8 @@ function update () {
 var topScore = 0;
 function render () {
   requestAnimationFrame(render);
+  keyDraw();
+  var drawing = draw;
   update();
   var centerAnimals = [0,0];
   for (var i=0; i<animals.length; i++) {
@@ -980,7 +976,8 @@ function render () {
     score = topScore;
   }
 
-  setCam([ camera[0]+cameraV[0], camera[1]+cameraV[1] ]);
+  var camVel = drawing ? 0.5 : 1;
+  setCam([ camera[0] + camVel * cameraV[0], camera[1] + camVel * cameraV[1] ]);
 
   var animalsData = [];
   for (var i=0; i<animals.length; ++i) {
@@ -1005,7 +1002,7 @@ function render () {
   gl.uniform1f(renderZoomL, zoom);
   gl.uniform2fv(cameraL, camera);
   gl.uniform2fv(mouseL, mouse);
-  gl.uniform1i(enableCursorL, !!dragStart && !dragCam);
+  gl.uniform1i(drawingL, drawing);
   gl.uniform1i(renderStartedL, started);
   gl.uniform1i(renderGameOverL, gameover);
   gl.uniform1f(renderScoreL, score);

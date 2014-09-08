@@ -9,7 +9,7 @@ uniform float zoom;
 uniform vec2 camera;
 uniform vec2 mouse;
 //uniform vec2 dragStart;
-uniform bool enableCursor;
+uniform bool drawing;
 uniform bool started;
 uniform bool gameover;
 uniform float score;
@@ -183,11 +183,16 @@ vec4 elementUI (vec3 clr) {
   center = vec2(s * i, 0.0) + vec2(radius);
   float dist = distance(p, center);
   vec3 c = colorFor(int(i));
+  bool d = drawing && int(i) == drawObject;
+
   if (dist < radius - zoom) {
-    return vec4(c, 0.8);
+    return vec4(c, d ? 1.0 : 0.6);
   }
   if (dist < radius) {
-    return vec4(0.2 + 0.3 * c - 0.7 * clr, 1.0);
+    if (d)
+      return vec4(0.2 + 1.3 * c, 1.0);
+    else
+      return vec4(0.2 + 0.3 * c - 0.7 * clr, 1.0);
   }
   return vec4(0.0);
 }
@@ -226,9 +231,11 @@ void main () {
     disp += dispPass(1.0, 0.1, 2.0);
   }
 
-  if (enableCursor) {
+/*
+  if (drawing) {
     disp += dispPass(3.0 * pow(smoothstep(zoom * drawRadius, 0.0, distance(gl_FragCoord.xy, mouse)), 0.5), 0.2, 5.0);
   }
+  */
 
   float uiMatchAlpha = 0.0;
   if (started && !gameover) {
@@ -286,10 +293,12 @@ void main () {
 
   c = mix(c, statePos.y < 0.0 ? colors[1] : colors[0], smoothstep(worldSize[0]-100.0, worldSize[0], statePos[0]));
 
-  if (enableCursor) {
+/*
+  if (drawing) {
     clr = cursor(distance(statePosFloor, floor((mouse + camera)/zoom)) / drawRadius, colorFor(drawObject));
     c = mix(c.rgb, clr.rgb, clr.a);
   }
+  */
   
   if (uiMatchAlpha > 0.0) {
     clr = elementUI(c);
