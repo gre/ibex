@@ -1,4 +1,3 @@
-
 precision highp float;
 
 uniform vec3 colors[9];
@@ -29,17 +28,7 @@ float rand(vec2 co){
   return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
 
-
-// source: http://glslsandbox.com/e#19207.5
-
-//3x5 digit sprites stored in "15 bit" numbers
-/*
-███     111
-█     001
-███  -> 111  -> 111001111100111 -> 29671
-█       100
-███     111
-*/
+// Digits display source: http://glslsandbox.com/e#19207.5
 float c_0 = 31599.0;
 float c_1 = 9362.0;
 float c_2 = 29671.0;
@@ -50,35 +39,16 @@ float c_6 = 31215.0;
 float c_7 = 29257.0;
 float c_8 = 31727.0;
 float c_9 = 31695.0;
-
 float extract_bit(float n, float b) {
   n = floor(n);
   b = floor(b);
   b = floor(n/pow(2.,b));
   return float(mod(b,2.) == 1.);
 }
-
-float fpmod(vec2 p, float l) {
-  p *= l;
-  return mod(p.x + 257. + mod(p.y + 17. + mod(-p.y + 5. + mod(p.x + 3. , l),l),l),l);
-}
-
 float sprite(float n, float w, float h, vec2 p) {
   float bounds = float(all(lessThan(p,vec2(w,h))) && all(greaterThanEqual(p,vec2(0,0))));
   return extract_bit(n,(2.0 - p.x) + 3.0 * p.y) * bounds;
 }
-
-float bit_row(float bit, float scale, vec2 p) {
-  float r = 0.;
-  float bounds = 0.;
-  for(int i = 0; i < 8; i++) {
-    bounds = float(all(lessThan(p, vec2(scale, scale))) && all(greaterThanEqual(p, vec2(0,0))));	
-    r += extract_bit(bit, float(i)) * bounds;
-    p.x -= scale;
-  }
-  return r;
-}
-
 float digit(float num, vec2 p) {
   num = mod(floor(num),10.0);
   if(num == 0.0) return sprite(c_0, 3., 5., p);
@@ -93,7 +63,6 @@ float digit(float num, vec2 p) {
   if(num == 9.0) return sprite(c_9, 3., 5., p);
   return 0.0;
 }
-
 float number (float n, vec2 p) {
   float c = 0.;
   vec2 cpos = vec2(1,1);
@@ -130,7 +99,7 @@ vec4 animal (vec2 p, vec2 pos, vec2 v, float size, float d, float T, float s) {
   // Invert in X according to velocity
   if (v.x > 0.0) pos.x = -pos.x;
   // Slope deform the animal
-  float slope = /*pos.y >= 5.0 ? 0.0 :*/ clamp(s, -3., 3.) * smoothstep(0.0, 4.0, pos.x);
+  float slope = clamp(s, -3., 3.) * smoothstep(0.0, 4.0, pos.x);
   // Translate to the pivot
   pos += vec2(3.5, slope);
   // Scale to the tile width (to match the same pixel world dimension)
@@ -229,10 +198,6 @@ vec4 cursor (float dist, vec3 clr) {
 }
 
 void main () {
-  /*
-  float brushDist = pow(smoothstep(zoom * drawRadius, 0.0, distance(gl_FragCoord.xy, dragStart)), 0.5);
-  vec2 disp = brushDispPass(brushDist);
-  */
   vec2 disp = vec2(0.0);
 
   bool lgo = false;
@@ -322,10 +287,6 @@ void main () {
     c = mix(c.rgb, clr.rgb, clr.a);
   }
   
-  /*
-  vec4 ui = UI2(c, distance(statePosFloor, floor((dragStart + camera)/zoom)) / drawRadius);
-  c = mix(c.rgb, ui.rgb, ui.a);
-  */
   if (uiMatchAlpha > 0.0) {
     clr = elementUI(c);
     c = mix(c.rgb, clr.rgb, clr.a);
@@ -358,4 +319,5 @@ void main () {
   
   gl_FragColor = vec4(c, 1.0);
 }
+
 

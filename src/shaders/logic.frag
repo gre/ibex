@@ -64,17 +64,16 @@ uniform int drawObject;
 
 uniform vec3 colors[_];
 
-vec4 getColor(ivec2 position) {
+vec3 getColor (ivec2 position) {
   vec2 uv = (gl_FragCoord.xy + vec2(position)) / size;
   if (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0)
-    return vec4(colors[0], 0.0);
-  return texture2D(state, uv);
+    return colors[0];
+  return texture2D(state, uv).rgb;
 }
 int get (ivec2 pos) {
-  vec3 cmp = getColor(pos).rgb;
+  vec3 cmp = getColor(pos);
   for (int i=0; i<_; ++i) {
-    vec3 ref = colors[i];
-    if (distance(cmp, ref) < 0.01)
+    if (distance(cmp, colors[i]) < 0.01)
       return i;
   }
   return 0;
@@ -85,12 +84,12 @@ int get (int x, int y) {
 
 
 // Match with weights
-float match (mat3 pattern, mat3 weights, ivec2 off) {
+float match (mat3 pattern, mat3 weights) {
   float w = 0.0;
   for (int x=-1; x<=1; ++x) {
     for (int y=-1; y<=1; ++y) {
       int v = int(pattern[-y+1][x+1]);
-      if (v == _ || v == get(x+off.x, y+off.y)) {
+      if (v == _ || v == get(ivec2(x, y))) {
         w += weights[-y+1][x+1];
       }
     }
@@ -98,37 +97,22 @@ float match (mat3 pattern, mat3 weights, ivec2 off) {
   return w;
 }
 
-float match (mat3 pattern, mat3 weights) {
-  return match(pattern, weights, ivec2(0));
-}
-
-// Match a pattern and return the nb of matches (ignoring the wildcards)
-int match (mat3 pattern) {
-  mat3 w = mat3(0.0);
-  for (int x=0; x<=2; ++x) {
-    for (int y=0; y<=2; ++y) {
-      if (int(pattern[y][x]) != _)
-        w[y][x] = 1.0;
+bool matchAtLeast (mat3 pattern, int n) {
+  for (int x=-1; x<=1; ++x) {
+    for (int y=-1; y<=1; ++y) {
+      int v = int(pattern[-y+1][x+1]);
+      if (
+        v != _ &&
+        v == get(ivec2(x, y)) &&
+        (n--) == 0)
+        return true;
     }
   }
-  return int(match(pattern, w));
+  return false;
 }
 
-bool matchAll (mat3 pattern, ivec2 off) {
-  mat3 w = mat3(1.0,1.0,1.0, 1.0,1.0,1.0, 1.0,1.0,1.0);
-  return match(pattern, w, off) == 9.0;
-}
-
-bool matchAll (mat3 pattern) {
-  return matchAll(pattern, ivec2(0));
-}
-
-// FIXME TODO improve perfs !!!!
 bool matchAny (mat3 pattern) {
-  return match(pattern) > 1;
-}
-bool matchOne (mat3 pattern) { // FIXME remove / replace with "matchLeft, matchRight, matchTop, matchBottom" ?
-  return matchAny(pattern);
+  return matchAtLeast(pattern, 1);
 }
 
 bool matchAnyAdjacent (int e) {
@@ -218,27 +202,27 @@ void main () {
    (
     !prevIsSolid && (
       RAND < 0.98 && (
-      matchAll(mat3(
+      matchAtLeast(mat3(
         W, _, _,
         _, _, _,
-        E, _, _))
+        E, _, _), 2)
       ||
-      matchAll(mat3(
+      matchAtLeast(mat3(
         _, _, W,
         _, _, _,
-        _, _, E))
+        _, _, E), 2)
       )
       ||
       RAND < 0.93 && (
-      matchAll(mat3(
+      matchAtLeast(mat3(
         _, _, _,
         W, _, _,
-        E, _, _))
+        E, _, _), 2)
       ||
-      matchAll(mat3(
+      matchAtLeast(mat3(
         _, _, _,
         _, _, W,
-        _, _, E))
+        _, _, E), 2)
       )))) {
     r = W;
   }
@@ -276,7 +260,7 @@ void main () {
     ||
 
     RAND < 0.03 &&
-    1<=match(mat3(
+    matchAny(mat3(
       _, S, _,
       S, _, S,
       _, _, _
@@ -286,7 +270,7 @@ void main () {
 
     // Earth -> Volcano
     if (
-    RAND < 0.006 && 
+    RAND < 0.006 &&
     match(mat3(
       F, F, F,
       F, _, F,
@@ -295,16 +279,16 @@ void main () {
      0.3, 0.2, 0.3,
      0.5, 0.0, 0.5,
      1.0, 1.2, 1.0
-    ))>3.0 - 2.1*RAND
+    )) > 3.0 - 2.1*RAND
 
     ||
 
     RAND < 0.01 &&
-    2<=match(mat3(
+    matchAtLeast(mat3(
       _, _, _,
       V, _, V,
       V, V, V
-    ))) {
+    ), 2)) {
       r = V;
     }
   }
@@ -356,7 +340,7 @@ void main () {
   ////// VOLCANO RULES /////
   
   // Volcano creates fire
-  if ((!prevIsSolid || prev==F) && matchAll(mat3(
+  if ((!prevIsSolid || prev==F) && matchAny(mat3(
       _, _, _,
       _, _, _,
       _, V, _))) {
@@ -394,15 +378,7 @@ void main () {
       S, _, S,
       S, S, S
     ))) {
-      if (RAND < 0.3) {
-        r = V;
-      }
-      else if (RAND < 0.6) {
-        r = S;
-      }
-      else {
-        r = E;
-      }
+      r = RAND < 0.3 ? V : RAND < 0.6 ? S : E;
     }
     
   }
@@ -411,8 +387,8 @@ void main () {
   float volcRelativeTime = mod(tick, 25.0);
   if (prevIsSolid &&
       p.y <= 1.0 &&
-      RAND < 0.3 &&
-      volcRelativeTime <= 1.0) {
+      volcRelativeTime <= 1.0 &&
+      RAND < 0.3) {
     float volcLgth = 10.0 * rand(vec2(seed*0.07 + tick - volcRelativeTime));
     float volcStart = rand(vec2(seed*0.01 + tick - volcRelativeTime)) * (size[0]-volcLgth);
     if (volcStart < p.x && p.x < volcStart+volcLgth)
@@ -463,15 +439,7 @@ void main () {
       V, _, V,
       V, V, V
     ))) {
-      if (RAND < 0.2) {
-        r = V;
-      }
-      else if (RAND < 0.6) {
-        r = S;
-      }
-      else {
-        r = E;
-      }
+      r = RAND < 0.2 ? V : RAND < 0.6 ? S : E;
     }
   }
 
@@ -482,17 +450,17 @@ void main () {
   }
 
   if (!prevIsSolid && RAND < 0.6 && (
-    matchAll(mat3(
+    matchAtLeast(mat3(
       _, _, W,
       _, _, Al,
       _, _, _
-    ))
+    ), 2)
     ||
-    matchAll(mat3(
+    matchAtLeast(mat3(
       W, _, _,
       Ar,_, _,
       _, _, _
-    ))
+    ), 2)
   )) {
     r = W;
   }
@@ -541,12 +509,7 @@ void main () {
         }
       }
       else if (drawObject == F) {
-        if (prevIsSolid) {
-          r = V;
-        }
-        else {
-          r = F;
-        }
+        r = prevIsSolid ? V : F;
       }
       else {
         r = drawObject;
@@ -557,12 +520,7 @@ void main () {
   //// Hell /////
 
   if (hellTriggerPosition(p)) {
-    if (prevIsSolid) {
-      r = V;
-    }
-    else {
-      r = F;
-    }
+    r = prevIsSolid ? V : F;
   }
 
   ///// SIMPLE ELEMENTS WHEN NOT RUNNING /////
