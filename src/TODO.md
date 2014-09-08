@@ -10,6 +10,9 @@ Prioritized TODO list
 Restart on Game Over
 ---
 
+Make sure animals are safe at spawn
+---
+
 Implement animal motion.
 ---
 AI motion have to be realist.
@@ -29,10 +32,6 @@ AI motion have to be realist.
 
 Implement animal graphics
 ---
-
-Make infinite exploration possible
----
-- accelerate the left destruction when width is high: trigger flames (bottom up fire drawing)
 
 Improve performance of map generation
 ---

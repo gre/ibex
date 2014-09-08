@@ -127,17 +127,23 @@ vec2 dispPass (float intensity, float amp, float speed) {
   );
 }
 
-vec3 colorFor (int i) {
-  if(i==0) return colors[0];
-  if(i==1) return colors[1];
-  if(i==2) return colors[2];
-  if(i==3) return colors[3];
+vec3 colorFor (int e) {
+  if(e==0) return colors[0];
+  if(e==1) return colors[1];
+  if(e==2) return colors[2];
+  if(e==3) return colors[3];
+  if(e==4) return colors[4];
+  if(e==5) return colors[5];
+  if(e==6) return colors[6];
+  if(e==7) return colors[7];
+  return colors[8];
 }
 
-vec4 stateColorPass (vec4 c, vec2 pos) {
-  if (distance(c.rgb, colors[8]) < 0.01) {
+vec3 stateColorPass (float cel, vec2 pos) {
+  int e = int(floor(.5 + 9. * cel));
+  vec3 c = colorFor(e);
+  if (e == 8)
     return c * mix(1.0, rand(pos), 0.2);
-  }
   return c;
 }
 
@@ -242,11 +248,13 @@ void main () {
   vec2 stateBound = worldSize;
   vec2 uv = (statePosFloor + 0.5) / stateBound;
   bool outOfBound = uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0;
-  vec4 stateColor = outOfBound ? vec4(statePos.y < 0.0 ? colors[1] : colors[0], 1.0) : stateColorPass(texture2D(state, uv), statePosFloor);
+  vec3 stateColor = outOfBound ?
+    (statePos.y < 0.0 ? colors[1] : colors[0]) :
+    stateColorPass(texture2D(state, uv).r, statePosFloor);
 
   vec2 pixelPos = fract(statePos);
 
-  vec3 c = stateColor.rgb;
+  vec3 c = stateColor;
 
   vec3 noiseColor = vec3(0.02) * vec3(
     rand(zoom*floor(gl_FragCoord.xy/zoom)+time/31.0),

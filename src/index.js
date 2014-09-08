@@ -82,12 +82,6 @@ function posE (e) {
   return [ e.clientX, resolution[1] - e.clientY ];
 }
 
-function dist (a, b) {
-  var dx = a[0] - b[0],
-      dy = a[1] - b[1];
-  return Math.sqrt(dx*dx+dy*dy);
-}
-
 var dragStart, dragCam, dragElement;
 
 function resetMouse () {
@@ -502,7 +496,7 @@ function animalUpdate (animal, center) {
       var vx = 0.2 + 0.12 * (cliffRightAfterPlatform[0] - cliffRightLastPlatform[0]);
       var vy = 0.2 + 0.12 * (cliffRightAfterPlatform[1] - cliffRightLastPlatform[1]);
       */
-      var vx = 0.1 + 0.08 * (cliffRightAfterPlatform[0] - cliffRightLastPlatform[0]), vy = 1;
+      var vx = 0.1 + 0.09 * (cliffRightAfterPlatform[0] - cliffRightLastPlatform[0]), vy = 1;
 
       decision = [
         "r", 0.7, x + cliffRightLastPlatform[0] - 1,
@@ -739,7 +733,6 @@ var logicSeedL = gl.getUniformLocation(program, "seed");
 var logicRunningL = gl.getUniformLocation(program, "running");
 var logicTickL = gl.getUniformLocation(program, "tick");
 var logicStartTickL = gl.getUniformLocation(program, "tickStart");
-var logicColorsL = gl.getUniformLocation(program, "colors");
 var logicStateL = gl.getUniformLocation(program, "state");
 var logicSizeL = gl.getUniformLocation(program, "size");
 var logicDrawL = gl.getUniformLocation(program, "draw");
@@ -764,7 +757,6 @@ gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, log
 gl.useProgram(program);
 gl.uniform1f(logicSeedL, seed);
 gl.uniform1i(logicStateL, 0);
-gl.uniform3fv(logicColorsL, colors);
 
 var logicProgram = program;
 
@@ -774,10 +766,8 @@ function step (a, b, x) {
 }
 
 function affectColor (buf, i, c) {
-  buf[i+0] = 255 * colors[c * 3+0];
-  buf[i+1] = 255 * colors[c * 3+1];
-  buf[i+2] = 255 * colors[c * 3+2];
-  buf[i+3] = 255;
+  buf[i] = Math.floor(256 * c / 9);
+  buf[i+3] = 1;
 }
 
 function generate (startX) {
@@ -1070,6 +1060,7 @@ function parseColors (bufin, bufout) {
   // bufin: RGBA colors, bufout: element indexes
   // bufin size == 4 * bufout size
   for (var i=0; i<bufin.length; i += 4) {
+    /*
     for (var c=0; c<colors.length; c += 3) {
       var diff = 0;
       for (var j=0; j<3; ++j) {
@@ -1078,7 +1069,8 @@ function parseColors (bufin, bufout) {
       }
       if (diff < 0.001) break;
     }
-    bufout[i/4] = c / 3;
+    */
+    bufout[i/4] = Math.floor(0.5 + 9 * bufin[i] / 256);
   }
 }
 

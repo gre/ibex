@@ -1,6 +1,7 @@
 #define RAND (S_=vec2(rand(S_), rand(S_+9.))).x
-
 #define _ 9
+
+precision highp float;
 
 int A  = 0;
 int E  = 1;
@@ -49,7 +50,6 @@ TODO     * Volcano + Source => IF source on top of volcano: sometimes creates Gr
 
   */
 
-precision highp float;
 uniform vec2 size;
 uniform float seed;
 uniform float tick;
@@ -62,19 +62,10 @@ uniform ivec2 drawPosition;
 uniform float drawRadius;
 uniform int drawObject;
 
-uniform vec3 colors[_];
-
-vec3 getColor (ivec2 position) {
+int get (ivec2 position) {
   vec2 uv = (gl_FragCoord.xy + vec2(position)) / size;
-  return (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0) ? colors[0] : texture2D(state, uv).rgb;
-}
-int get (ivec2 pos) {
-  vec3 cmp = getColor(pos);
-  for (int i=0; i<_; ++i) {
-    if (distance(cmp, colors[i]) < 0.01)
-      return i;
-  }
-  return 0;
+  return (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0) ? 0 : 
+    int(floor(.5 + 9. * texture2D(state, uv).r));
 }
 int get (int x, int y) {
   return get(ivec2(x, y));
@@ -87,7 +78,7 @@ float match (mat3 pattern, mat3 weights) {
   for (int x=-1; x<=1; ++x) {
     for (int y=-1; y<=1; ++y) {
       int v = int(pattern[-y+1][x+1]);
-      if (v == _ || v == get(ivec2(x, y))) {
+      if (v == _ || v == get(x, y)) {
         w += weights[-y+1][x+1];
       }
     }
@@ -533,16 +524,6 @@ void main () {
 
   // r = int(grassDistrib(gl_FragCoord.xy) * 3.0); // for TEST
 
-  vec3 c;
-  if (r==0)c=colors[0];
-  if (r==1)c=colors[1];
-  if (r==2)c=colors[2];
-  if (r==3)c=colors[3];
-  if (r==4)c=colors[4];
-  if (r==5)c=colors[5];
-  if (r==6)c=colors[6];
-  if (r==7)c=colors[7];
-  if (r==8)c=colors[8];
-  gl_FragColor=vec4(c,1.0); //: gl_FragColor=vec4(colors[r], 1.0);
+  gl_FragColor = vec4(float(r) / 9.0,  0.0, 0.0, 1.0);
 }
 
