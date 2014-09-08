@@ -184,7 +184,6 @@ function keyDraw () {
     drawObject = 3;
     draw = 1;
   }
-  console.log(dragStart, dragCam, drawObject);
   if (!draw && dragStart && !dragCam) {
     draw = 1;
     drawPosition = posToWorld(uiElementCenterPos(drawObject));
