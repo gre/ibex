@@ -7,6 +7,9 @@ Game Goal
 Prioritized TODO list
 ===
 
+Restart on Game Over
+---
+
 Implement animal motion.
 ---
 AI motion have to be realist.

@@ -66,9 +66,7 @@ uniform vec3 colors[_];
 
 vec3 getColor (ivec2 position) {
   vec2 uv = (gl_FragCoord.xy + vec2(position)) / size;
-  if (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0)
-    return colors[0];
-  return texture2D(state, uv).rgb;
+  return (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0) ? colors[0] : texture2D(state, uv).rgb;
 }
 int get (ivec2 pos) {
   vec3 cmp = getColor(pos);
@@ -104,7 +102,7 @@ bool matchAtLeast (mat3 pattern, int n) {
       if (
         v != _ &&
         v == get(ivec2(x, y)) &&
-        (n--) == 0)
+        (--n) == 0)
         return true;
     }
   }
@@ -140,8 +138,8 @@ float grassDistrib (vec2 p) {
 
 bool hellTriggerPosition (vec2 p) {
   if (tickStart==0.0) return false;
-  float hellTickStart = 0.0;
-  float hellTickInterv = 100.0;
+  float hellTickStart = 100.0;
+  float hellTickInterv = 400.0;
   float hellSize = 4.0;
   float dt = tick - tickStart - hellTickStart;
   float x = floor(dt / hellTickInterv);
@@ -259,7 +257,7 @@ void main () {
     ))>3.0 - 2.5*RAND
     ||
 
-    RAND < 0.03 &&
+    RAND < 0.01 &&
     matchAny(mat3(
       _, S, _,
       S, _, S,
@@ -298,7 +296,7 @@ void main () {
   if (grassMaxHeight > 0) {
     if (prev == G) {
       r = G;
-      if (RAND < 0.95 && (
+      if (RAND < 0.9 && (
         matchAny(mat3(
           F, F, F,
           F, _, F,
@@ -360,25 +358,25 @@ void main () {
     }
 
     // cool down: Volcano -> Earth
-    if (RAND<0.005 && !matchAny(mat3(
+    if (RAND<0.005 && !matchAtLeast(mat3(
       _, _, _,
       _, _, _,
       F, F, F
-    )) && !matchAny(mat3(
+    ), 2) && !matchAtLeast(mat3(
       _, _, _,
       _, _, _,
       V, V, V
-    ))) {
+    ), 2)) {
       r = E;
     }
 
     // Volcano <-> Source : A volcano can disappear near source
-    if (matchAny(mat3(
+    if (matchAtLeast(mat3(
       S, S, S,
       S, _, S,
       S, S, S
-    ))) {
-      r = RAND < 0.3 ? V : RAND < 0.6 ? S : E;
+    ), 2)) {
+      r = RAND < 0.3 ? V : (RAND < 0.6 ? S : E);
     }
     
   }
@@ -439,7 +437,7 @@ void main () {
       V, _, V,
       V, V, V
     ))) {
-      r = RAND < 0.2 ? V : RAND < 0.6 ? S : E;
+      r = RAND < 0.2 ? V : (RAND < 0.6 ? S : E);
     }
   }
 
@@ -449,6 +447,7 @@ void main () {
     if (RAND < 0.00001) r = Ar;
   }
 
+/*
   if (!prevIsSolid && RAND < 0.6 && (
     matchAtLeast(mat3(
       _, _, W,
@@ -464,6 +463,7 @@ void main () {
   )) {
     r = W;
   }
+  */
 
   int wind = r==Al ? Al : r == Ar ? Ar : 0;
   float maxWind = 0.95;

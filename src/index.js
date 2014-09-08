@@ -700,7 +700,7 @@ function onResize () {
   resolution = [ window.innerWidth, window.innerHeight ];
   C.width = resolution[0];
   C.height = resolution[1];
-  zoom = Math.round(2 + C.height / 250);
+  zoom = Math.round(2 + Math.sqrt(C.width * C.height) / 250);
   gl.viewport(0, 0, C.width, C.height);
   var x1 = 0, y1 = 0, x2 = resolution[0], y2 = resolution[1];
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
