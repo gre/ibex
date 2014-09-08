@@ -752,8 +752,8 @@ function affectColor (buf, i, c) {
 }
 
 function generate (startX) {
-  var randTerrainAmount = 0.08 * Math.random() * Math.random();
-  var randTerrainDown = 100 * Math.random() * Math.random();
+  var randTerrainAmount = !worldStartX ? 0 : 0.08 * Math.random() * Math.random();
+  var randTerrainDown = !worldStartX ? 0 : 100 * Math.random() * Math.random();
 
   // This could be implemented in a 3rd shader for performance.
 

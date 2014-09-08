@@ -303,7 +303,7 @@ void main () {
     // Dry: Source -> Earth
     if (
       RAND<0.06 &&
-      ( int(SW==W||SW==S) + int(SS==W||SS==S) + int(SE==W||SE==S) < 1 )
+      ( int(NW==W||NW==S) + int(NN==W||NN==S) + int(NE==W||NE==S) < 1 )
 
       || // if Fire: Source -> Earth
       ( EE==F || WW==F || SS==F || SW==F || SE==F )
