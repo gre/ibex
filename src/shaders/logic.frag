@@ -1,17 +1,7 @@
 #define RAND (S_=vec2(rand(S_), rand(S_+9.))).x
-#define _ 9
+#define AnyADJ(e) (NW==e||SE==e||NE==e||SW==e||NN==e||SS==e||EE==e||WW==e)
 
 precision highp float;
-
-int A  = 0;
-int E  = 1;
-int F  = 2;
-int W  = 3;
-int V  = 4;
-int S  = 5;
-int Al = 6;
-int Ar = 7;
-int G  = 8;
 
 /**
   * Game Rule Interactions.
@@ -23,32 +13,42 @@ int G  = 8;
   * =======
   * Water + Nothing => fall / slide
   * Fire + Nothing => grow
-TODO     * Air + Nothing => move (directional wind)
-TODO     * Water + Fire => sometimes creates Air (Steam/Wind)
-TODO     * Water + Air => Water is deviated (wind)
-TODO     * Fire + Air => Fire decrease IF not surrounded by air OTHERWISE is increase (need oxygen)
+  * Air + Nothing => move (directional wind)
+  * Water + Air => Water is deviated (wind)
+  * Fire + Air => Fire decrease
   * Earth + Water => rarely creates Water Source (water infiltration)
   * Earth + Fire => rarely creates Volcano (fire melt ground into lava)
-TODO     * Earth + Air => sometimes Destroy (erosion), rarely creates Fire (spark)
   *
   * Secondary elements: Source, Volcano
   * =========
   * Source + Nothing => creates Water (on bottom).
   * Volcano + Nothing => creates Fire (on top)
-TODO     * Volcano + Source => IF source on top of volcano: sometimes creates Ground. OTHERWISE: sometimes creates volcano.
+  * Volcano + Source => IF source on top of volcano: sometimes creates Ground. OTHERWISE: sometimes creates volcano.
   * Volcano + Water => rarely creates Source.
   * Earth + Volcano => rarely Volcano expand / grow up in the Earth.
   * Earth + Source => rarely Source expand / infiltrate in the Earth.
   * Source + Fire => Source die.
   *
   * Cases where nothing happens:
+  * Water + Fire
   * Earth + Nothing
   * Volcano + Fire
   * Volcano + Air
+  * Earth + Air
   * Source + Air
   * Source + Water
-
   */
+
+// Elements
+int A  = 0;
+int E  = 1;
+int F  = 2;
+int W  = 3;
+int V  = 4;
+int S  = 5;
+int Al = 6;
+int Ar = 7;
+int G  = 8;
 
 uniform vec2 size;
 uniform float seed;
@@ -62,53 +62,10 @@ uniform ivec2 drawPosition;
 uniform float drawRadius;
 uniform int drawObject;
 
-int get (ivec2 position) {
-  vec2 uv = (gl_FragCoord.xy + vec2(position)) / size;
+int get (int x_, int y_) {
+  vec2 uv = (gl_FragCoord.xy + vec2(x_, y_)) / size;
   return (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0) ? 0 : 
     int(floor(.5 + 9. * texture2D(state, uv).r));
-}
-int get (int x, int y) {
-  return get(ivec2(x, y));
-}
-
-
-// Match with weights
-float match (mat3 pattern, mat3 weights) {
-  float w = 0.0;
-  for (int x=-1; x<=1; ++x) {
-    for (int y=-1; y<=1; ++y) {
-      int v = int(pattern[-y+1][x+1]);
-      if (v == _ || v == get(x, y)) {
-        w += weights[-y+1][x+1];
-      }
-    }
-  }
-  return w;
-}
-
-bool matchAtLeast (mat3 pattern, int n) {
-  for (int x=-1; x<=1; ++x) {
-    for (int y=-1; y<=1; ++y) {
-      int v = int(pattern[-y+1][x+1]);
-      if (
-        v != _ &&
-        v == get(ivec2(x, y)) &&
-        (--n) == 0)
-        return true;
-    }
-  }
-  return false;
-}
-
-bool matchAny (mat3 pattern) {
-  return matchAtLeast(pattern, 1);
-}
-
-bool matchAnyAdjacent (int e) {
-  return matchAny(mat3(
-    e, e, e,
-    e, _, e,
-    e, e, e));
 }
 
 bool between (float f, float a, float b) {
@@ -139,187 +96,149 @@ bool hellTriggerPosition (vec2 p) {
 }
 
 void main () {
-
   vec2 p = gl_FragCoord.xy;
-  
-  int prev = get(0, 0);
-  int down = get(0, -1);
-
   vec2 S_ = p + 0.001 * tick;
+  
+  int NW = get(-1, 1);
+  int NN = get( 0, 1);
+  int NE = get( 1, 1);
+  int WW = get(-1, 0);
+  int CC = get( 0, 0);
+  int EE = get( 1, 0);
+  int SW = get(-1,-1);
+  int SS = get( 0,-1);
+  int SE = get( 1,-1);
 
-  bool prevIsSolid = prev==E||prev==G||prev==V||prev==S;
+  bool prevIsSolid = CC==E||CC==G||CC==V||CC==S;
 
   int r = A;
 
+  int grassMaxHeight = int(20.0 * pow(grassDistrib(p), 1.4));
+  float rainRelativeTime = mod(tick, 300.0);
+  float volcRelativeTime = mod(tick, 25.0);
+
   //////// FIRE RULES ///////
 
+  // Fire grow / Fire + Water
   if (
-   // Fire grow / Fire + Water
-   match(mat3(
-     W, W, W, // If water drop...
-     W, W, W, // ...or water nearby.
-     F, F, F  // Fire will move up and expand a bit.
-   ), mat3(
-     -0.05, -0.3, -0.05, // Negative weights because water kill fire.
-     -0.5, -0.6, -0.5,
-     0.35, 0.9, 0.35 // Weights for the Fire
-   )) >= 0.9 - 0.6 * RAND // The sum of matched weights must be enough important, also with some randomness
+    -0.05 * float(NW==W) + -0.30 * float(NN==W) + -0.05 * float(NE==W) + // If water drop...
+    -0.50 * float(WW==W) + -0.30 * float(CC==W) + -0.50 * float(EE==W) + // ...or water nearby.
+     0.35 * float(SW==F) +  0.90 * float(SS==F) +  0.35 * float(SE==F)   // Fire will move up and expand a bit.
+   >= 0.9 - 0.6 * RAND // The sum of matched weights must be enough important, also with some randomness
+   
+   ||  // Fire propagation: When fire met grass, fire can stay to continue to consume it
+
+   CC == F && RAND < 0.8 && AnyADJ(G)
   ) {
     r = F;
   }
 
-  // Fire propagation: When fire met grass, fire can stay to continue to consume it
-  if (prev == F && RAND < 0.8 && matchAnyAdjacent(G)) {
-    r = F;
-  }
 
   ////// WATER RULES ///////
 
   if (
   // Water drop / Water + Fire
-   between(match(mat3(
-     W, W, W,
-     W, F, W,
-     _, F, _
-   ), mat3(
-     0.3, 0.9, 0.3,
-     0.1, -0.3, 0.1,
-     0.0, -0.3, 0.0
-   )), 0.9 - 0.6 * RAND, 1.4 + 0.3 * RAND)
-   ||
-   // Water flow rules
-   (
-    !prevIsSolid && (
-      RAND < 0.98 && (
-      matchAtLeast(mat3(
-        W, _, _,
-        _, _, _,
-        E, _, _), 2)
-      ||
-      matchAtLeast(mat3(
-        _, _, W,
-        _, _, _,
-        _, _, E), 2)
-      )
-      ||
-      RAND < 0.93 && (
-      matchAtLeast(mat3(
-        _, _, _,
-        W, _, _,
-        E, _, _), 2)
-      ||
-      matchAtLeast(mat3(
-        _, _, _,
-        _, _, W,
-        _, _, E), 2)
-      )))) {
-    r = W;
-  }
+    between(
+      0.3 * float(NW==W) +  0.9 * float(NN==W) +  0.3 * float(NE==W) +
+      0.1 * float(WW==W) + -0.3 * float(CC==F) +  0.1 * float(EE==W) +
+                           -0.3 * float(SS==F)  
+      ,
+      0.9 - 0.6 * RAND,
+      1.4 + 0.3 * RAND
+    )
 
-  // Occasional rain
-  float rainRelativeTime = mod(tick, 300.0);
-  if (!prevIsSolid &&
-      p.y >= size[1]-1.0 &&
-      rainRelativeTime < 100.0) {
-    float rainLgth = 100.0 * rand(vec2(seed + tick - rainRelativeTime));
-    float rainStart = rand(vec2(seed*0.7 + tick - rainRelativeTime)) * (size[0]-rainLgth);
-    if (rainStart < p.x && p.x < rainStart+rainLgth)
-      r = W;
+    || // Water flow on earth rules
+
+    !prevIsSolid &&
+    RAND < 0.98 &&
+    ( (WW==W||NW==W) && SW==E || (EE==W||NE==W) && SE==E )
+
+    || // Occasional rain
+    !prevIsSolid &&
+    p.y >= size[1]-1.0 &&
+    rainRelativeTime < 100.0 &&
+    between(
+      p.x - 
+      (rand(vec2(seed*0.7 + tick - rainRelativeTime)) * size[0]) // Rain Start
+      ,
+      0.0, 
+      100.0 * rand(vec2(seed + tick - rainRelativeTime)) // Rain Length
+    )
+    
+    || // Source creates water
+    !prevIsSolid && (
+      0.9 * float(NW==S) +  1.0 * float(NN==S) +  0.9 * float(NE==S) +
+      0.7 * float(WW==S) +                        0.7 * float(EE==S)
+      >= 1.0 - 0.3 * RAND
+    )
+  ) {
+    r = W;
   }
 
   ////// EARTH RULES ////
 
-  if (prev == E) {
-
-    if (!(get(-1, 0)==A && get(1, 0)==A)) // Hack to workaround with the bug in the terrain seamless
-      r = E;
+  if (CC == E) {
+    // Hack to workaround with the bug in the terrain seamless
+    if (!(WW==A && EE==A)) r = E;
 
     // Earth -> Source
     if (
-    RAND<0.01 &&
-    match(mat3(
-      W, W, W,
-      W, _, W,
-      W, W, W
-    ), mat3(
-     1.0, 1.2, 1.0,
-     0.5, 0.0, 0.5,
-     0.3, 0.2, 0.3
-    ))>3.0 - 2.5*RAND
-    ||
+      // water sometimes create sources
+      RAND < 0.01 && (
+        1.0 * float(NW==W) + 1.2 * float(NN==W) + 1.0 * float(NE==W) +
+        0.5 * float(WW==W) +                      0.5 * float(EE==W) +
+        0.3 * float(SW==W) + 0.2 * float(SS==W) + 0.3 * float(SE==W)  
+        >= 3.0 - 2.5 * RAND
+      )
 
-    RAND < 0.01 &&
-    matchAny(mat3(
-      _, S, _,
-      S, _, S,
-      _, _, _
-    ))) {
+      ||
+
+      // Source is going down
+      RAND < 0.01 && ( WW==S || NN==S || EE==S )
+    ) {
       r = S;
     }
 
     // Earth -> Volcano
     if (
-    RAND < 0.006 &&
-    match(mat3(
-      F, F, F,
-      F, _, F,
-      F, F, F
-    ), mat3(
-     0.3, 0.2, 0.3,
-     0.5, 0.0, 0.5,
-     1.0, 1.2, 1.0
-    )) > 3.0 - 2.1*RAND
+    RAND < 0.006 && (
+      0.3 * float(NW==F) + 0.2 * float(SS==F) + 0.3 * float(NE==F) +  
+      0.5 * float(WW==F) +                      0.5 * float(EE==F) +
+      1.0 * float(SW==F) + 1.2 * float(NN==F) + 1.0 * float(SE==F)
+      >= 3.0 - 2.1 * RAND
+    )
 
     ||
 
-    RAND < 0.01 &&
-    matchAtLeast(mat3(
-      _, _, _,
-      V, _, V,
-      V, V, V
-    ), 2)) {
+    // Volcano is going up
+    RAND < 0.01 && ( int(WW==V) + int(SS==V) + int(EE==V) + int(SE==V) + int(SW==V) > 1 )
+    ) {
       r = V;
     }
   }
-
+  
   ////// Grass RULES ////
-  int grassMaxHeight = int(20.0 * pow(grassDistrib(p), 1.4));
   if (grassMaxHeight > 0) {
-    if (prev == G) {
+    if (CC == G) {
       r = G;
-      if (RAND < 0.9 && (
-        matchAny(mat3(
-          F, F, F,
-          F, _, F,
-          F, F, F
-        ))
-        ||
-        matchAny(mat3(
-          V, V, V,
-          V, _, V,
-          V, V, V
-        ))
+      if (
+      CC == G &&
+      RAND < 0.9 && (
+        AnyADJ(F) ||
+        AnyADJ(V)
       )) {
         r = F;
       }
     }
-    else if (!prevIsSolid && (matchAnyAdjacent(E) || matchAnyAdjacent(G) || matchAnyAdjacent(S))) {
+    else if (!prevIsSolid && (AnyADJ(E) || AnyADJ(G) || AnyADJ(S))) {
       if (RAND < 0.02 &&
         get(0, -grassMaxHeight) != G && (
-        down==G && RAND < 0.07 || // The grass sometimes grow
-        down==E && RAND < 0.02 || // The grass rarely spawn by itself
-        matchAny(mat3(
-          W, W, W,
-          W, _, W,
-          W, W, W
-        ))
-        ||
-        matchAny(mat3(
-          S, S, S,
-          S, _, S,
-          S, S, S
-        ))
-      )) {
+          SS==G && RAND < 0.07 || // The grass sometimes grow
+          SS==E && RAND < 0.02 || // The grass rarely spawn by itself
+          AnyADJ(W) ||
+          AnyADJ(S)
+        )
+      ) {
         r = G;
       }
     }
@@ -329,105 +248,71 @@ void main () {
   ////// VOLCANO RULES /////
   
   // Volcano creates fire
-  if ((!prevIsSolid || prev==F) && matchAny(mat3(
-      _, _, _,
-      _, _, _,
-      _, V, _))) {
+  if ((!prevIsSolid || CC==F) && SS==V) {
     r = F;
   }
 
-  if (prev == V) {
+  if (CC == V) {
     r = V;
 
     // if Water: Volcano -> Earth
-    if (matchAny(mat3(
-      W, W, W,
-      W, _, W,
-      _, _, _
-    ))) {
+    if (
+      NW==W || NN==W || NE==W || EE==W || WW==W
+    ) {
       r = RAND < 0.8 ? S : E;
     }
 
     // cool down: Volcano -> Earth
-    if (RAND<0.005 && !matchAtLeast(mat3(
-      _, _, _,
-      _, _, _,
-      F, F, F
-    ), 2) && !matchAtLeast(mat3(
-      _, _, _,
-      _, _, _,
-      V, V, V
-    ), 2)) {
+    if (
+      RAND<0.005 &&
+      ( int(SW==F||SW==V) + int(SS==F||SS==V) + int(SE==F||SE==V) < 2 )
+    ) {
       r = E;
     }
 
     // Volcano <-> Source : A volcano can disappear near source
-    if (matchAtLeast(mat3(
-      S, S, S,
-      S, _, S,
-      S, S, S
-    ), 2)) {
+    if (
+      int(NW==S) + int(SE==S) + int(NE==S) + int(SW==S) + int(NN==S) + int(SS==S) + int(EE==S) + int(WW==S)
+      > 1
+    ) {
       r = RAND < 0.3 ? V : (RAND < 0.6 ? S : E);
     }
-    
   }
 
   // Occasional volcano
-  float volcRelativeTime = mod(tick, 25.0);
   if (prevIsSolid &&
-      p.y <= 1.0 &&
-      volcRelativeTime <= 1.0 &&
-      RAND < 0.3) {
-    float volcLgth = 10.0 * rand(vec2(seed*0.07 + tick - volcRelativeTime));
-    float volcStart = rand(vec2(seed*0.01 + tick - volcRelativeTime)) * (size[0]-volcLgth);
-    if (volcStart < p.x && p.x < volcStart+volcLgth)
-      r = V;
+    p.y <= 1.0 &&
+    volcRelativeTime <= 1.0 &&
+    RAND < 0.3 &&
+    between(
+      p.x -
+      rand(vec2(seed*0.01 + tick - volcRelativeTime)) * size[0] // Volc start
+      ,
+      0.0,
+      10.0 * rand(vec2(seed*0.07 + tick - volcRelativeTime)) // Volc length
+    )
+  ) {
+    r = V;
   }
 
   ////// SOURCE RULES /////
 
-  if ((!prevIsSolid || prev==W) && match(mat3(
-      S, S, S,
-      S, _, S,
-      _, _, _), mat3(
-      0.9, 1.0, 0.9,
-      0.7, 0.0, 0.7,
-      0.0, 0.0, 0.0
-    )) >= 1.0 - 0.3*RAND) {
-    r = W;
-  }
-
-  if (prev == S) {
+  if (CC == S) {
     r = S;
 
     // Dry: Source -> Earth
-    if (RAND<0.06 && !matchAny(mat3(
-      W, W, W,
-      _, _, _,
-      _, _, _
-    )) && !matchAny(mat3(
-      S, S, S,
-      _, _, _,
-      _, _, _
-    ))) {
-      r = E;
-    }
+    if (
+      RAND<0.06 &&
+      ( int(SW==W||SW==S) + int(SS==W||SS==S) + int(SE==W||SE==S) < 1 )
 
-    // if Fire: Source -> Earth
-    if (matchAny(mat3(
-      _, _, _,
-      F, _, F,
-      F, F, F
-    ))) {
+      || // if Fire: Source -> Earth
+      ( EE==F || WW==F || SS==F || SW==F || SE==F )
+    ) {
       r = E;
     }
 
     // Volcano <-> Source : A source can disappear near volcano
-    if (matchAny(mat3(
-      V, V, V,
-      V, _, V,
-      V, V, V
-    ))) {
+    if (AnyADJ(V)) {
       r = RAND < 0.2 ? V : (RAND < 0.6 ? S : E);
     }
   }
@@ -438,39 +323,16 @@ void main () {
     if (RAND < 0.00001) r = Ar;
   }
 
-/*
-  if (!prevIsSolid && RAND < 0.6 && (
-    matchAtLeast(mat3(
-      _, _, W,
-      _, _, Al,
-      _, _, _
-    ), 2)
-    ||
-    matchAtLeast(mat3(
-      W, _, _,
-      Ar,_, _,
-      _, _, _
-    ), 2)
-  )) {
-    r = W;
-  }
-  */
-
   int wind = r==Al ? Al : r == Ar ? Ar : 0;
-  float maxWind = 0.95;
-  float f = match(mat3(
-    Ar, _, Al,
-    Ar, _, Al,
-    Ar, _, Al
-    ), mat3(
-    -0.1+0.05*(RAND-0.5), 0.0, 0.1,
-    -0.65, 0.0, 0.65,
-    -0.2, 0.0, 0.2+0.05*(RAND-0.5)
-  ));
-  if (between(f, 0.4 * RAND, maxWind)) {
+  float f =
+    (-0.1+0.05*(RAND-0.5)) * float(NW==Ar) +     0.12                  * float(NE==Al) +
+    -0.65                  * float(WW==Ar) +     0.65                  * float(EE==Al) +
+    -0.1                   * float(SW==Ar) +     (0.2+0.05*(RAND-0.5)) * float(SE==Al) ;
+
+  if (between(f, 0.4 * RAND, 0.95)) {
     wind = Al;
   }
-  else if (between(f, -maxWind, -0.4 * RAND)) {
+  else if (between(f, -0.95, -0.4 * RAND)) {
     wind = Ar;
   }
 
@@ -514,15 +376,13 @@ void main () {
     r = prevIsSolid ? V : F;
   }
 
-  ///// SIMPLE ELEMENTS WHEN NOT RUNNING /////
+  ///// keep only simple elements when not running /////
   if (!running) {
     if (r == F || r == W|| r == G) r = A;
     if (r == V || r == S) r = E;
   }
 
   ///// Return the color result /////
-
-  // r = int(grassDistrib(gl_FragCoord.xy) * 3.0); // for TEST
 
   gl_FragColor = vec4(float(r) / 9.0,  0.0, 0.0, 1.0);
 }

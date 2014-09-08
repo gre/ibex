@@ -490,12 +490,6 @@ function animalUpdate (animal, center) {
     // TODO from new events, compute if or not the animal should reconsider previous decisions
 
     if ((fire < 0 || !fire && Math.random() < 0.5) && cliffRight && cliffRightFollowedBySafePlatform) {
-      //console.log(animal);
-      //console.log(animal.p,":", cliffRightLastPlatform , "=>",  cliffRightAfterPlatform);
-      /*
-      var vx = 0.2 + 0.12 * (cliffRightAfterPlatform[0] - cliffRightLastPlatform[0]);
-      var vy = 0.2 + 0.12 * (cliffRightAfterPlatform[1] - cliffRightLastPlatform[1]);
-      */
       var vx = 0.1 + 0.09 * (cliffRightAfterPlatform[0] - cliffRightLastPlatform[0]), vy = 1;
 
       decision = [
@@ -566,11 +560,6 @@ function animalUpdate (animal, center) {
         animal.p[1] ++;
         animal.v = [a, b];
       }
-      /*
-      if (c) {
-        console.log(action+" done", a, b);
-      }
-      */
     }
     if (!c) i -= 3;
     if (i>0) animal.t.splice(0, i);
@@ -669,7 +658,6 @@ var renderDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
 
 var cameraL = gl.getUniformLocation(program, "camera");
 var mouseL = gl.getUniformLocation(program, "mouse");
-//var dragStartL = gl.getUniformLocation(program, "dragStart");
 var enableCursorL = gl.getUniformLocation(program, "enableCursor");
 var resolutionL = gl.getUniformLocation(program, "resolution");
 
@@ -1017,7 +1005,6 @@ function render () {
   gl.uniform1f(renderZoomL, zoom);
   gl.uniform2fv(cameraL, camera);
   gl.uniform2fv(mouseL, mouse);
-  //if (dragStart) gl.uniform2fv(dragStartL, dragStart);
   gl.uniform1i(enableCursorL, !!dragStart && !dragCam);
   gl.uniform1i(renderStartedL, started);
   gl.uniform1i(renderGameOverL, gameover);
@@ -1060,16 +1047,6 @@ function parseColors (bufin, bufout) {
   // bufin: RGBA colors, bufout: element indexes
   // bufin size == 4 * bufout size
   for (var i=0; i<bufin.length; i += 4) {
-    /*
-    for (var c=0; c<colors.length; c += 3) {
-      var diff = 0;
-      for (var j=0; j<3; ++j) {
-        var d = colors[c + j] - (bufin[i + j]/256);
-        diff += d * d;
-      }
-      if (diff < 0.001) break;
-    }
-    */
     bufout[i/4] = Math.floor(0.5 + 9 * bufin[i] / 256);
   }
 }

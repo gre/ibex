@@ -141,10 +141,7 @@ vec3 colorFor (int e) {
 
 vec3 stateColorPass (float cel, vec2 pos) {
   int e = int(floor(.5 + 9. * cel));
-  vec3 c = colorFor(e);
-  if (e == 8)
-    return c * mix(1.0, rand(pos), 0.2);
-  return c;
+  return (e==8 ? mix(1.0, rand(pos), 0.2) : 1.0) * colorFor(e);
 }
 
 
@@ -170,7 +167,6 @@ bool logo (vec2 p, vec2 pos, float size) {
     3.2 < p.x && p.x < 3.4 && !(0.4 < p.y && p.y < 0.6) ||
     3.6 < p.x && p.x < 3.8 && !(0.4 < p.y && p.y < 0.6) ||
     3.4 < p.x && p.x < 3.6 && 0.4 < p.y && p.y < 0.6
-
   );
 }
 
