@@ -339,11 +339,13 @@ void main () {
   }
 
   if (!gameover && started) {
-    vec2 counterPos = p - resolution + vec2(30.0, 0.0);
-    vec4 scoreAnimal = animal(p, resolution - vec2(20.0, 30.0), vec2(0.0), 3.0, 0., 0., 0.0);
+    float divider = 150.0;
+    float counterMult = divider * resolution.x / 6000.0;
+    vec2 counterPos = p - resolution + vec2(3.0 * counterMult, 0.0);
+    vec4 scoreAnimal = animal(p, resolution - vec2(2.0, 3.0) * counterMult, vec2(0.0), 0.3 * counterMult, 0., 0., 0.0);
     c = mix(c, scoreAnimal.rgb + 0.3 * (1.0-c), scoreAnimal.a);
 
-    if (number2(float(animalsLength), (counterPos/resolution) * 200. * vec2(1,resolution.y/resolution.x)) > 0.0) {
+    if (number2(float(animalsLength), (counterPos/resolution) * divider * vec2(1,resolution.y/resolution.x)) > 0.0) {
       c = 0.3 + 0.7 * (1.0-c);
     }
   }

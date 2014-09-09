@@ -1,9 +1,5 @@
 var x, y, i, j;
 
-onerror = function (e) {
-  err.innerHTML = e.message || e;
-};
-
 ////// Game constants / states /////
 
 var uiBrushSize = 6;
@@ -128,15 +124,6 @@ C.addEventListener("mousedown", function (e) {
   dragStart = posE(e);
   dragCam = !isCursor(dragStart);
   selectElStart = uiSelectElement(dragStart);
-  /*
-  if (el != -1) {
-    drawObject = el;
-    dragCam = 0;
-  }
-  else {
-    dragCam = 1;
-  }
-  */
   camStart =[].concat(camera);
 });
 
@@ -213,11 +200,16 @@ function keyDraw () {
 //
 //       38
 //    37 40 39
-//
+var currentCamKeys, lastCamKeysChange = Date.now();
 function handleKeys () {
   var s = 6,
       dx = keysDown[39]-keysDown[37],
       dy = keysDown[38]-keysDown[40];
+  var camKeys = dx+"_"+dy;
+  if (camKeys != currentCamKeys) {
+    currentCamKeys = camKeys;
+    lastCamKeysChange = Date.now();
+  }
   cameraV = [ s*dx, s*dy ];
 }
 
@@ -1023,7 +1015,7 @@ function render () {
     score = topScore;
   }
 
-  var camVel = drawing ? 0.5 : 1;
+  var camVel = drawing ? 0.5 : (currentCamKeys!="0_0" && Date.now()-lastCamKeysChange > 500 ? 2 : 1);
   var dx = camVel * cameraV[0];
   var dy = camVel * cameraV[1];
   if (camStart) {
