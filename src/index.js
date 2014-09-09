@@ -83,17 +83,17 @@ function posE (e) {
   return [ e.clientX, resolution[1] - e.clientY ];
 }
 
-var dragStart, dragCam, dragElement;
+var dragStart, dragCam, camStart, dragElement;
 
 function resetMouse () {
-  dragStart = dragCam = 0;
+  camStart = dragStart = dragCam = 0;
   C.style.cursor = started ? "default" : "pointer";
 }
 resetMouse();
 
 function uiElement (p) {
   var size = 10 + 2 * zoom * uiBrushSize;
-  var originY = resolution[1] / 4 - size / 2;
+  var originY = resolution[1] / 3 - size / 2;
   if (originY < p[1] && p[1] < originY + size) {
     var uiP = (resolution[0] - 4*size) / 2;
     var i = Math.floor((p[0]-uiP) / size);
@@ -106,7 +106,7 @@ function uiElement (p) {
 function uiElementCenterPos (i) {
   var size = 10 + 2 * zoom * uiBrushSize;
   var uiP = (resolution[0] - 4*size) / 2;
-  return [ uiP + size * (i + 0.5), resolution[1] / 4 ];
+  return [ uiP + size * (i + 0.5), resolution[1] / 3 ];
 }
 
 C.addEventListener("mouseleave", resetMouse);
@@ -116,8 +116,8 @@ C.addEventListener("mousedown", function (e) {
   if (!started || gameover) return;
   dragStart = posE(e);
   drawObject = uiElement(dragStart);
-  dragCam = drawObject == -1 ? [].concat(camera) : 0;
-  //if (!dragCam) drawRadius = uiBrushSize;
+  dragCam = drawObject == -1;
+  camStart =[].concat(camera);
 });
 
 C.addEventListener("mouseup", function (e) {
@@ -128,15 +128,6 @@ C.addEventListener("mouseup", function (e) {
   if (i != -1 && drawObject == i) {
     draw = 1;
     drawPosition = posToWorld(uiElementCenterPos(i));
-  }
-  /*
-  else if (!dragCam && drawObject != -1) {
-    draw = 1;
-    drawPosition = posToWorld(p);
-  }
-  */
-
-  if (!dragCam) {
   }
   resetMouse();
 });
@@ -154,7 +145,10 @@ C.addEventListener("mousemove", function (e) {
     var dy = p[1] - dragStart[1];
 
     if (dragCam) {
-      setCam([ dragCam[0] - dx, dragCam[1] - dy ]);
+      setCam([ camStart[0] - dx, camStart[1] - dy ]);
+    }
+    else {
+      setCam([ camStart[0] + dx, camStart[1] + dy ]);
     }
 
   }
@@ -505,10 +499,10 @@ function animalUpdate (animal, center) {
       var d =
         Math.random() < 0.1 ? animal.sr.a - animal.sl.a :
         water && waterDistance < 5 && Math.random()<0.5 ? water :
-        Math.random()<0.3 && Math.abs(deltaCenter[0])>50 ? deltaCenter[0] :
+        Math.random()<0.2 && Math.abs(deltaCenter[0])>80 ? deltaCenter[0] :
         1
         ;
-      if (r < 0.7 || water && waterDistance < 5) {
+      if (r < 0.8 || water && waterDistance < 5) {
         decision = [
           "w", (d>=0 ? 1 : -1) * 0.3, x + (d>=0 ? animal.sr.a-1 : -animal.sl.a+1)
         ];
@@ -848,7 +842,7 @@ function rechunk (fromX, toX) {
   generate(genStartX);
 
   camera[0] -= fromX * zoom;
-  if (dragCam) dragCam[0] -= fromX * zoom;
+  if (camStart) camStart[0] -= fromX * zoom;
 }
 
 function checkRechunk () {
@@ -976,7 +970,13 @@ function render () {
   }
 
   var camVel = drawing ? 0.5 : 1;
-  setCam([ camera[0] + camVel * cameraV[0], camera[1] + camVel * cameraV[1] ]);
+  var dx = camVel * cameraV[0];
+  var dy = camVel * cameraV[1];
+  if (camStart) {
+    camStart[0] += dx;
+    camStart[1] += dy;
+  }
+  setCam([ camera[0] + dx, camera[1] + dy ]);
 
   var animalsData = [];
   for (var i=0; i<animals.length; ++i) {

@@ -63,7 +63,7 @@ float digit(float num, vec2 p) {
   if(num == 9.0) return sprite(c_9, 3., 5., p);
   return 0.0;
 }
-float number (float n, vec2 p) {
+float number6 (float n, vec2 p) {
   float c = 0.;
   vec2 cpos = vec2(1,1);
   c += digit(n/100000.,floor(p-cpos));
@@ -74,6 +74,14 @@ float number (float n, vec2 p) {
   cpos.x += 4.;
   c += digit(n/100.,floor(p-cpos));
   cpos.x += 4.;
+  c += digit(n/10.,floor(p-cpos));
+  cpos.x += 4.;
+  c += digit(n,floor(p-cpos));
+  return c;
+}
+float number2 (float n, vec2 p) {
+  float c = 0.;
+  vec2 cpos = vec2(-8,-6);
   c += digit(n/10.,floor(p-cpos));
   cpos.x += 4.;
   c += digit(n,floor(p-cpos));
@@ -175,7 +183,7 @@ vec4 elementUI (vec3 clr) {
   float margin = 10.;
   float s = 2.*radius+margin;
   vec2 size = vec2(8.*radius + 3.*margin, 2.*radius);
-  vec2 center = vec2(resolution.x / 2.0, resolution.y / 4.0);
+  vec2 center = vec2(resolution.x / 2.0, resolution.y / 3.0);
   vec2 origin = center - size / 2.;
   vec2 p = gl_FragCoord.xy - origin;
   if (p.x < 0.0 || p.x > size.x || p.y < 0.0 || p.y > size.y) return vec4(0.0);
@@ -186,25 +194,30 @@ vec4 elementUI (vec3 clr) {
   bool d = drawing && int(i) == drawObject;
 
   if (dist < radius - zoom) {
-    return vec4(c, d ? 1.0 : 0.6);
+    return vec4(
+      mix(clr, vec3(1.0), 0.8) * (0.1 + 1.2 * c),
+      d ? 0.6 * (dist/radius) : 0.9);
   }
   if (dist < radius) {
     if (d)
       return vec4(0.2 + 1.3 * c, 1.0);
     else
-      return vec4(0.2 + 0.3 * c - 0.7 * clr, 1.0);
+      return vec4(0.3 + 0.4 * c - 0.7 * clr, 1.0);
   }
   return vec4(0.0);
 }
 
+/*
 vec4 cursor (float dist, vec3 clr) {
   if (dist < 1.0) {
     return vec4(clr, 0.6);
   }
   return vec4(0.0);
 }
+*/
 
 void main () {
+  vec2 p = gl_FragCoord.xy;
   vec2 disp = vec2(0.0);
 
   bool lgo = false;
@@ -223,7 +236,7 @@ void main () {
       logoP = (resolution-vec2(4.4 * s, s))/2.0;
     }
     grad = vec2(3.0*s, 1.6 * s);
-    if (logo(gl_FragCoord.xy, logoP, s)) {
+    if (logo(p, logoP, s)) {
       lgo = true;
     }
   }
@@ -240,13 +253,13 @@ void main () {
   float uiMatchAlpha = 0.0;
   if (started && !gameover) {
     uiMatchAlpha = elementUI(vec3(0.0)).a;
-    if (uiMatchAlpha > 0. && uiMatchAlpha <= 0.8) {
-      disp += dispPass(0.8, 0.2, 3.0);
+    if (uiMatchAlpha > 0.) {
+      disp += dispPass(1.6, 0.08, 3.0);
     }
   }
 
   // Compute where the camera/zoom is in the state texture
-  vec2 statePos = (gl_FragCoord.xy + disp + camera) / zoom;
+  vec2 statePos = (p + disp + camera) / zoom;
   vec2 statePosFloor = floor(statePos);
   vec2 stateBound = worldSize;
   vec2 uv = (statePosFloor + 0.5) / stateBound;
@@ -260,9 +273,9 @@ void main () {
   vec3 c = stateColor;
 
   vec3 noiseColor = vec3(0.02) * vec3(
-    rand(zoom*floor(gl_FragCoord.xy/zoom)+time/31.0),
-    rand(zoom*floor(gl_FragCoord.xy/zoom)+time/80.1),
-    rand(zoom*floor(gl_FragCoord.xy/zoom)+time/13.2)
+    rand(zoom*floor(p/zoom)+time/31.0),
+    rand(zoom*floor(p/zoom)+time/80.1),
+    rand(zoom*floor(p/zoom)+time/13.2)
   );
   vec3 pixelColor = -vec3(0.03) * (pixelPos.x - pixelPos.y);
 
@@ -320,14 +333,22 @@ void main () {
     }
   }
 
-  vec2 scorePos = gl_FragCoord.xy;
-
+  vec2 scorePos = p;
   if (gameover) {
     scorePos -= (resolution - resolution / vec2(6.0, 36.0)) / 2.;
   }
-
-  if (number(score, (scorePos/resolution.xy) * 128. * vec2(1,resolution.y/resolution.x)) > 0.0) {
+  if (number6(score, (scorePos/resolution) * 128. * vec2(1,resolution.y/resolution.x)) > 0.0) {
     c = 0.1 + 0.9 * (1.0-c);
+  }
+
+  if (!gameover && started) {
+    vec2 counterPos = p - resolution + vec2(30.0, 0.0);
+    vec4 scoreAnimal = animal(p, resolution - vec2(20.0, 30.0), vec2(0.0), 3.0, 0., 0., 0.0);
+    c = mix(c, scoreAnimal.rgb + 0.3 * (1.0-c), scoreAnimal.a);
+
+    if (number2(float(animalsLength), (counterPos/resolution) * 200. * vec2(1,resolution.y/resolution.x)) > 0.0) {
+      c = 0.3 + 0.7 * (1.0-c);
+    }
   }
   
   gl_FragColor = vec4(c, 1.0);
