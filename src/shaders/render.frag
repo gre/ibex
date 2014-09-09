@@ -8,7 +8,6 @@ uniform vec2 resolution;
 uniform float zoom;
 uniform vec2 camera;
 uniform vec2 mouse;
-//uniform vec2 dragStart;
 uniform bool drawing;
 uniform bool started;
 uniform bool gameover;
@@ -20,7 +19,6 @@ uniform float animals[8 * 20]; // array of [x, y, vx, vy, size, deathReason, dea
 uniform int animalsLength;
 uniform sampler2D tiles;
 
-uniform bool draggingElement;
 uniform float drawRadius;
 uniform int drawObject;
 
@@ -178,43 +176,39 @@ bool logo (vec2 p, vec2 pos, float size) {
   );
 }
 
-vec4 elementUI (vec3 clr) {
-  float radius = 8. * zoom;
-  float margin = 10.;
+vec4 cursorUI (vec2 p, vec3 clr) {
+  vec2 center = resolution / vec2(2.0, 3.0);
+  float radius = 6. * zoom;
+  float dist = distance(p, center);
+  vec3 c = colorFor(drawObject);
+  vec3 c2 = 1.2 * (0.1 + c);
+  if (dist < radius - 4.0) {
+    return vec4(1.2 * mix(clr * c2, c, 0.6 - 0.3 * float(drawing)), 1.0);
+  }
+  else if (dist < radius) {
+    return vec4(c2 - 0.7 * clr, 1.0);
+  }
+  return vec4(0.0);
+}
+
+vec4 elements (vec2 p, vec3 clr) {
+  float radius = 4. * zoom;
+  float margin = 8.;
   float s = 2.*radius+margin;
+  vec2 center = resolution / vec2(2.0, 3.0) - vec2(0.0, 14.0 * zoom);
   vec2 size = vec2(8.*radius + 3.*margin, 2.*radius);
-  vec2 center = vec2(resolution.x / 2.0, resolution.y / 3.0);
-  vec2 origin = center - size / 2.;
-  vec2 p = gl_FragCoord.xy - origin;
+  p = p - center + size / 2.0;
   if (p.x < 0.0 || p.x > size.x || p.y < 0.0 || p.y > size.y) return vec4(0.0);
   float i = floor(p.x / s);
   center = vec2(s * i, 0.0) + vec2(radius);
   float dist = distance(p, center);
-  vec3 c = colorFor(int(i));
-  bool d = drawing && int(i) == drawObject;
-
-  if (dist < radius - zoom) {
-    return vec4(
-      mix(clr, vec3(1.0), 0.8) * (0.1 + 1.2 * c),
-      d ? 0.6 * (dist/radius) : 0.9);
-  }
+  vec3 c = 1.1 * colorFor(int(i)) + 0.2 - 0.2 * clr;
+  bool d = int(i) == drawObject;
   if (dist < radius) {
-    if (d)
-      return vec4(0.2 + 1.3 * c, 1.0);
-    else
-      return vec4(0.3 + 0.4 * c - 0.7 * clr, 1.0);
+    return vec4(c, d ? 0.9 : 0.3);
   }
   return vec4(0.0);
 }
-
-/*
-vec4 cursor (float dist, vec3 clr) {
-  if (dist < 1.0) {
-    return vec4(clr, 0.6);
-  }
-  return vec4(0.0);
-}
-*/
 
 void main () {
   vec2 p = gl_FragCoord.xy;
@@ -252,7 +246,7 @@ void main () {
 
   float uiMatchAlpha = 0.0;
   if (started && !gameover) {
-    uiMatchAlpha = elementUI(vec3(0.0)).a;
+    uiMatchAlpha = cursorUI(p, vec3(0.0)).a;
     if (uiMatchAlpha > 0.) {
       disp += dispPass(1.6, 0.08, 3.0);
     }
@@ -314,9 +308,12 @@ void main () {
   */
   
   if (uiMatchAlpha > 0.0) {
-    clr = elementUI(c);
+    clr = cursorUI(p, c);
     c = mix(c.rgb, clr.rgb, clr.a);
   }
+
+  clr = elements(p, c);
+  c = mix(c.rgb, clr.rgb, clr.a);
 
   if (!started || gameover) {
     if (lgo) {

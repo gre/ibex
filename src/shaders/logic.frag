@@ -54,6 +54,7 @@ uniform vec2 size;
 uniform float seed;
 uniform float tick;
 uniform float tickStart;
+uniform float startX;
 uniform sampler2D state;
 uniform bool running;
 
@@ -86,13 +87,13 @@ float grassDistrib (vec2 p) {
 
 bool hellTriggerPosition (vec2 p) {
   if (tickStart==0.0) return false;
-  float hellTickStart = 150.0;
-  float hellTickInterv = 150.0;
-  float hellSize = 8.0;
-  float dt = tick - tickStart - hellTickStart;
+  float hellTickStart = 250.0;
+  float hellTickInterv = 100.0;
+  float hellSize = 6.0;
+  float dt = tick - tickStart - hellTickStart - hellSize * startX;
   float x = floor(dt / hellTickInterv);
   float y = (dt - x * hellTickInterv);
-  return distance(hellSize * vec2(x, y), p) <= hellSize;
+  return distance(hellSize * vec2(2.0 * x, y), p) <= hellSize;
 }
 
 void main () {
@@ -211,7 +212,7 @@ void main () {
     ||
 
     // Volcano is going up
-    RAND < 0.01 && ( int(WW==V) + int(SS==V) + int(EE==V) + int(SE==V) + int(SW==V) > 1 )
+    RAND < 0.01 + 0.01 * smoothstep(500.0, 2000.0, startX / p.x) && ( int(WW==V) + int(SS==V) + int(EE==V) + int(SE==V) + int(SW==V) > 1 )
     ) {
       r = V;
     }
@@ -281,7 +282,7 @@ void main () {
 
   // Occasional volcano
   if (prevIsSolid &&
-    p.y <= 1.0 &&
+    p.y <= 2.0 &&
     volcRelativeTime <= 1.0 &&
     RAND < 0.3 &&
     between(

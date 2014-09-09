@@ -1,8 +1,12 @@
 var x, y, i, j;
 
+onerror = function (e) {
+  err.innerHTML = e.message || e;
+};
+
 ////// Game constants / states /////
 
-var uiBrushSize = 8;
+var uiBrushSize = 6;
 
 var seed = Math.random();
 var C = document.createElement("canvas");
@@ -39,7 +43,7 @@ var camAutoThreshold = 160;
 var tick = 0;
 var startTick = 0;
 var worldRefreshTick = 0;
-var worldWindow = 128; // The size of the world chunk window in X
+var worldWindow = 90; // The size of the world chunk window in X
 var worldSize = [ 3 * worldWindow, 256 ];
 var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
 var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
@@ -52,9 +56,8 @@ var cameraV = [0, 0 ];
 var mouse = [ 0, 0 ];
 
 var draw = 0;
-var draggingElement = 0;
 var drawPosition;
-var drawObject;
+var drawObject = 1;
 var drawRadius = uiBrushSize;
 var buttons = [0,0,0,0];
 
@@ -83,7 +86,12 @@ function posE (e) {
   return [ e.clientX, resolution[1] - e.clientY ];
 }
 
-var dragStart, dragCam, camStart, dragElement;
+function distance (a, b) {
+  var dx = a[0] - b[0], dy = a[1] - b[1];
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+var dragStart, dragCam, camStart, dragElement, selectElStart;
 
 function resetMouse () {
   camStart = dragStart = dragCam = 0;
@@ -91,22 +99,25 @@ function resetMouse () {
 }
 resetMouse();
 
-function uiElement (p) {
-  var size = 10 + 2 * zoom * uiBrushSize;
-  var originY = resolution[1] / 3 - size / 2;
-  if (originY < p[1] && p[1] < originY + size) {
-    var uiP = (resolution[0] - 4*size) / 2;
-    var i = Math.floor((p[0]-uiP) / size);
+function uiSelectElement (p) {
+  var height = 2 * 4 * zoom;
+  var originY = resolution[1] / 3 - 14 * zoom - height / 2;
+  if (originY < p[1] && p[1] < originY + height) {
+    var width = 8 * zoom + 8;
+    var x = (resolution[0] - 4 * width) / 2;
+    var i = Math.floor((p[0]-x)/width);
     if (0 <= i && i < 4) {
       return i;
     }
   }
   return -1;
 }
-function uiElementCenterPos (i) {
-  var size = 10 + 2 * zoom * uiBrushSize;
-  var uiP = (resolution[0] - 4*size) / 2;
-  return [ uiP + size * (i + 0.5), resolution[1] / 3 ];
+
+function isCursor (p) {
+  return distance(cursorCenterPos(), p) < zoom * uiBrushSize;
+}
+function cursorCenterPos () {
+  return [ resolution[0] / 2, resolution[1] / 3 ];
 }
 
 C.addEventListener("mouseleave", resetMouse);
@@ -115,8 +126,17 @@ C.addEventListener("mousedown", function (e) {
   e.preventDefault();
   if (!started || gameover) return;
   dragStart = posE(e);
-  drawObject = uiElement(dragStart);
-  dragCam = drawObject == -1;
+  dragCam = !isCursor(dragStart);
+  selectElStart = uiSelectElement(dragStart);
+  /*
+  if (el != -1) {
+    drawObject = el;
+    dragCam = 0;
+  }
+  else {
+    dragCam = 1;
+  }
+  */
   camStart =[].concat(camera);
 });
 
@@ -124,10 +144,11 @@ C.addEventListener("mouseup", function (e) {
   if (!started) start();
   if (!started || gameover) return;
   var p = posE(e);
-  var i = uiElement(p);
-  if (i != -1 && drawObject == i) {
-    draw = 1;
-    drawPosition = posToWorld(uiElementCenterPos(i));
+  if (selectElStart != -1) {
+    var selectElP = uiSelectElement(p);
+    if (selectElStart == selectElP) {
+      drawObject = selectElStart;
+    }
   }
   resetMouse();
 });
@@ -136,9 +157,9 @@ C.addEventListener("mousemove", function (e) {
   if (!started || gameover) return;
   var p = posE(e);
   mouse = p;
-  var i = uiElement(p);
+  var selectElP = uiSelectElement(p);
 
-  C.style.cursor = dragStart ? (!dragCam ? "none" : "move") : (i != -1 ? "pointer" : "default");
+  C.style.cursor = dragStart ? (!dragCam ? "none" : "move") : (isCursor(p)||selectElP!=-1 ? "pointer" : "default");
 
   if (dragStart) {
     var dx = p[0] - dragStart[0];
@@ -162,30 +183,31 @@ var keysDown = new Uint8Array(200); // we do that because nicely initialized to 
 
 function keyDraw () {
   if (!started || gameover) return;
+  if (keysDown[32]) {
+    draw = 1;
+  }
   if (keysDown[87]||keysDown[90]) {
     drawObject = 0;
-    draw = 1;
   }
   else if (keysDown[88]) {
     drawObject = 1;
-    draw = 1;
   }
   else if (keysDown[67]) {
     drawObject = 2;
-    draw = 1;
   }
   else if (keysDown[86]) {
     drawObject = 3;
-    draw = 1;
   }
   if (!draw && dragStart && !dragCam) {
     draw = 1;
-    drawPosition = posToWorld(uiElementCenterPos(drawObject));
+    //drawPosition = posToWorld(uiElementCenterPos(drawObject));
   }
+  /*
   if (draw) {
     drawPosition = posToWorld(uiElementCenterPos(drawObject));
-    drawRadius = uiBrushSize;
   }
+  */
+  drawPosition = posToWorld(cursorCenterPos());
 }
 
 //
@@ -591,6 +613,12 @@ function animalUpdate (animal, center) {
   else {
     animal.p = p;
   }
+
+  /*
+  if (isNaN(animal.p[0]+animal.p[1])) {
+    console.log("Animal got NaN positions!!!", animal);
+  }
+  */
 }
 
 //////////////////////////////////////
@@ -640,7 +668,6 @@ var renderAnimalsLengthL = gl.getUniformLocation(program, "animalsLength");
 var renderAnimalsTilesL = gl.getUniformLocation(program, "tiles");
 var renderColorsL = gl.getUniformLocation(program, "colors");
 var renderDrawObjectL = gl.getUniformLocation(program, "drawObject");
-var renderDrawDragL = gl.getUniformLocation(program, "draggingElement");
 var renderDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
 
 var cameraL = gl.getUniformLocation(program, "camera");
@@ -707,6 +734,7 @@ validateProg(program);
 var logicSeedL = gl.getUniformLocation(program, "seed");
 var logicRunningL = gl.getUniformLocation(program, "running");
 var logicTickL = gl.getUniformLocation(program, "tick");
+var logicWorldStartL = gl.getUniformLocation(program, "startX");
 var logicStartTickL = gl.getUniformLocation(program, "tickStart");
 var logicStateL = gl.getUniformLocation(program, "state");
 var logicSizeL = gl.getUniformLocation(program, "size");
@@ -858,8 +886,8 @@ function checkRechunk () {
       maxX = Math.max(animals[i].p[0], maxX);
     }
   }
-  var windowInf = Math.max(worldStartX, worldWindow * Math.floor(minX / worldWindow - 1));
-  var windowSup = Math.max(worldStartX + worldSize[0], worldWindow * Math.ceil(maxX / worldWindow + 1));
+  var windowInf = Math.max(worldStartX, worldWindow * Math.floor(minX / worldWindow - 2));
+  var windowSup = Math.max(worldStartX + worldSize[0], worldWindow * Math.ceil(maxX / worldWindow + 2));
 
   var fromX = Math.max(0, windowInf - worldStartX); // No going back
   var toX = Math.max(worldSize[0], fromX + (windowSup - windowInf)); // No going back
@@ -895,6 +923,28 @@ function init () {
   }
 }
 
+function gameOver () {
+  localStorage.ibex = Math.max(score, localStorage.ibex||0);
+  setTimeout(function () {
+    onclick = location.reload();
+  }, 2000);
+}
+
+function start () {
+  started = 1;
+  init();
+
+  cameraV[1] = 3;
+  var camT = Date.now();
+  (function check () {
+    if (Date.now() - camT > 5000 || camera[1] + resolution[1] >= worldSize[1] * zoom) {
+      cameraV[1] = 0;
+      startTick = tick;
+    }
+    else setTimeout(check, 0);
+  }());
+}
+
 var startTime = Date.now();
 var lastUpdate = 0;
 var lastRefreshWorld = startTime + 5000;
@@ -909,6 +959,7 @@ function update () {
   }
   gl.uniform2fv(logicSizeL, worldSize);
   gl.uniform1f(logicTickL, tick);
+  gl.uniform1f(logicWorldStartL, worldStartX);
   gl.uniform1f(logicStartTickL, startTick);
   gl.uniform1i(logicRunningL, started);
   gl.uniform1i(logicDrawL, draw);
@@ -964,6 +1015,9 @@ function render () {
   score = score + 0.01*(topScore-score);
 
   if (started && !animals.length) {
+    if (!gameover) {
+      gameOver();
+    }
     cameraV[0] = 1;
     gameover = 1;
     score = topScore;
@@ -1009,7 +1063,6 @@ function render () {
     gl.uniform1fv(renderAnimalsL, animalsData);
   }
   gl.uniform1i(renderAnimalsLengthL, animals.length);
-  gl.uniform1i(renderDrawDragL, draggingElement);
   gl.uniform1f(renderDrawRadiusL, drawRadius);
   gl.uniform1i(renderDrawObjectL, drawObject);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -1021,21 +1074,6 @@ document.body.innerHTML = '';
 document.body.appendChild(C);
 
 render();
-
-function start () {
-  started = 1;
-  init();
-
-  cameraV[1] = 3;
-  var camT = Date.now();
-  (function check () {
-    if (Date.now() - camT > 5000 || camera[1] + resolution[1] >= worldSize[1] * zoom) {
-      cameraV[1] = 0;
-      startTick = tick;
-    }
-    else setTimeout(check, 0);
-  }());
-}
 
 ///////////// UTILITIES ////////////////////
 
