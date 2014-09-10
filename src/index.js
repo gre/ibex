@@ -1,26 +1,37 @@
 var x, y, i, j;
 
+var sounds = [
+ [0,,0.1812,,0.1349,0.4524,,0.2365,,,,,,0.0819,,,,,1,,,,,0.5]
+].map(jsfxr);
+
+function play (i) {
+  var player = new Audio();
+  player.src = sounds[i];
+  player.play();
+}
+
 ////// Game constants / states /////
 
-MAX_ANIMALS = 30;
-uiBrushSize = 6;
+var MAX_ANIMALS = 30;
+var uiBrushSize = 6;
 
-seed = Math.random();
-C = document.createElement("canvas");
+var seed = Math.random();
+var C = document.createElement("canvas");
 
-started = 0;
-gameover = 0;
-score = topScore = +(localStorage.ibex || 0);
-tiles = new Image();
+var started = 0;
+var gameover = 0;
+var topScore = +(localStorage.ibex || 0);
+var score = topScore;
+var tiles = new Image();
 tiles.src = "t.png";
 
 // in milliseconds
-updateRate = 35;
-refreshWorldRate = 300;
+var updateRate = 35;
+var refreshWorldRate = 300;
 
-initialAnimals = 8;
+var initialAnimals = 8;
 
-colors = [
+var colors = [
   0.11, 0.16, 0.23, // 0: air
   0.74, 0.66, 0.51, // 1: earth
   0.84, 0.17, 0.08, // 2: fire
@@ -35,34 +46,34 @@ colors = [
   0.20, 0.60, 0.20   // 8: grass (forest)
 ];
 
-camAutoSpeed = 4;
-camAutoThreshold = 160;
+var camAutoSpeed = 4;
+var camAutoThreshold = 160;
 
-tick = 0;
-startTick = 0;
-worldRefreshTick = 0;
-worldWindow = 90; // The size of the world chunk window in X
-worldSize = [ 3 * worldWindow, 256 ];
-rescueSpawnMinY = 10;
-rescueSpawnMaxY = 150;
-worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
-worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
-worldStartX = 0;
+var tick = 0;
+var startTick = 0;
+var worldRefreshTick = 0;
+var worldWindow = 90; // The size of the world chunk window in X
+var worldSize = [ 3 * worldWindow, 256 ];
+var rescueSpawnMinY = 10;
+var rescueSpawnMaxY = 150;
+var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
+var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
+var worldStartX = 0;
 
 // resolution
 // zoom
-camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
-cameraV = [0, 0 ];
-mouse = [ 0, 0 ];
+var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
+var cameraV = [0, 0 ];
+var mouse = [ 0, 0 ];
 
-draw = 0;
+var draw = 0;
 // drawPosition
-drawObject = 1;
-drawRadius = uiBrushSize;
-buttons = [0,0,0,0];
+var drawObject = 1;
+var drawRadius = uiBrushSize;
+var buttons = [0,0,0,0];
 
-animals = [];
-alive = toRescue = 0;
+var animals = [];
+var alive = toRescue = 0;
 
 //////// Game events /////
 
