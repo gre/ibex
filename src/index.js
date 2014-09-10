@@ -1050,7 +1050,7 @@ function render () {
     else if (self.d<0) {
       for (j=0; j<animals.length; j++) {
         var other = animals[j];
-        if (!other.d && distance(self.p, other.p) < 6) {
+        if (!other.d && distance(self.p, other.p) < 10) {
           self.d = 0;
           break;
         }

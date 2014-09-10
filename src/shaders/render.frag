@@ -407,8 +407,8 @@ void main () {
 
     float divider = 150.0;
     float counterMult = 0.015 * resolution.x;
-    vec2 counterPos = p - resolution + vec2(4.0 * counterMult, 0.0);
-    vec4 scoreAnimal = animal(p, resolution - vec2(2.0, 2.6) * counterMult, vec2(0.0), 0.0, 0.0, 0.0, 0.3 * counterMult);
+    vec2 counterPos = p - resolution + vec2(4.0 * counterMult, 2.5);
+    vec4 scoreAnimal = animal(p, resolution - vec2(2.0, 3.0) * counterMult, vec2(0.0), 0.0, 0.0, 0.0, 0.3 * counterMult);
     c = mix(c, scoreAnimal.rgb + 0.2 - 0.3 * c, scoreAnimal.a);
 
     if (number2(alive, (counterPos/resolution) * divider * vec2(1,resolution.y/resolution.x)) > 0.0) {
@@ -416,7 +416,7 @@ void main () {
     }
 
     counterPos += vec2(0.0, 4.0 * counterMult);
-    scoreAnimal = animal(p, resolution - vec2(2.0, 6.6) * counterMult, vec2(0.0), -1.0, 0.0, 0.0, 0.3 * counterMult);
+    scoreAnimal = animal(p, resolution - vec2(2.0, 7.0) * counterMult, vec2(0.0), -1.0, 0.0, 0.0, 0.3 * counterMult);
     c = mix(c, scoreAnimal.rgb + 0.2 - 0.3 * c, scoreAnimal.a);
 
     if (number2(toRescue, (counterPos/resolution) * divider * vec2(1,resolution.y/resolution.x)) > 0.0) {
