@@ -2,6 +2,7 @@ var x, y, i, j;
 
 ////// Game constants / states /////
 
+MAX_ANIMALS = 30;
 uiBrushSize = 6;
 
 seed = Math.random();
@@ -15,7 +16,7 @@ tiles.src = "t.png";
 
 // in milliseconds
 updateRate = 35;
-refreshWorldRate = 500;
+refreshWorldRate = 300;
 
 initialAnimals = 8;
 
@@ -42,6 +43,8 @@ startTick = 0;
 worldRefreshTick = 0;
 worldWindow = 90; // The size of the world chunk window in X
 worldSize = [ 3 * worldWindow, 256 ];
+rescueSpawnMinY = 10;
+rescueSpawnMaxY = 150;
 worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
 worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
 worldStartX = 0;
@@ -59,6 +62,7 @@ drawRadius = uiBrushSize;
 buttons = [0,0,0,0];
 
 animals = [];
+alive = toRescue = 0;
 
 //////// Game events /////
 
@@ -254,7 +258,10 @@ function Animal (initialPosition, dt) {
   // dt: next decision time
   self.dt = dt;
 
-  // this.d <- died flag
+  // this.d <- the animal status.
+  //      *  -1  animal to rescue.
+  //      *   0  alive. 
+  //      * > 0  died, with a reason code
   // this.T <- death time
   // this.sl <- stats left
   // this.sr <- stats right
@@ -354,7 +361,7 @@ function animalDie (animal, reason) {
 }
 
 function animalUpdate (animal, center) {
-  if (animal.d) return;
+  if (animal.d>0) return;
   animalSyncSight(animal);
 
   var x, y, i,
@@ -405,9 +412,8 @@ function animalUpdate (animal, center) {
   //////// Animal decision (each 500ms - 1s) ///////
 
   var now = Date.now();
-  if (animal.t.length==0 || now > animal.dt) {
+  if (!animal.d && (animal.t.length==0 || now > animal.dt)) {
     if (now > animal.dt) {
-      //console.log("FORGET");
       animal.t = []; // Forget the previous decision
     }
 
@@ -530,8 +536,6 @@ function animalUpdate (animal, center) {
 
   //// Animal apply move & check collision
 
-  // TODO unfold decisions
-
   if (groundDiff == 0) {
     var i, c = 1;
     for (i = 0; i<animal.t.length && c; i += 3) {
@@ -567,7 +571,7 @@ function animalUpdate (animal, center) {
 
   animalSyncSight(animal);
 
-  // TODO apply the real velocity from the environnement
+  // apply the real velocity from the environnement
   var v = [].concat(animal.v);
   var els = animal.sl[0].e;
   if (v[0]) {
@@ -648,6 +652,8 @@ gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
 onResize();
 
 var renderTimeL = gl.getUniformLocation(program, "time");
+var renderAliveL = gl.getUniformLocation(program, "alive");
+var renderToRescueL = gl.getUniformLocation(program, "toRescue");
 var renderZoomL = gl.getUniformLocation(program, "zoom");
 var renderStartedL = gl.getUniformLocation(program, "started");
 var renderGameOverL = gl.getUniformLocation(program, "gameover");
@@ -832,6 +838,49 @@ function generate (startX) {
 
   if (swp === cur) worldPixelBuf = swp;
 
+  // Locate good spots to spawn some animals to rescue
+
+  var nbSpots = Math.min(
+    Math.random() * 3 + 1 - 4 * Math.random() * Math.random(),
+    MAX_ANIMALS-animals.length);
+  var spots = [];
+
+  // Dichotomic search starting from the center
+  function locateSpot (xMin, xMax, maxIteration) {
+    //console.log(arguments, spots);
+    if (!maxIteration || nbSpots <= spots.length) return;
+    var xCenter = Math.floor(xMin+(xMax-xMin)/2);
+    var airOnTop = 0;
+    var found = [];
+    for (
+      y = Math.floor(rescueSpawnMaxY - Math.random() * (rescueSpawnMaxY-rescueSpawnMinY)); // Not always spawn from the top
+      y > rescueSpawnMinY;
+      y--
+    ) {
+      var isEarth = get(worldPixelBuf, xCenter, y);
+      if (airOnTop>6 && isEarth) {
+        spots.push([ worldStartX + xCenter, y + 1 ]);
+        break;
+      }
+      airOnTop = isEarth ? 0 : airOnTop + 1;
+    }
+    if (Math.random() < 0.5) {
+      locateSpot(xMin, xCenter, maxIteration-1);
+      locateSpot(xCenter, xMax, maxIteration-1);
+    }
+    else {
+      locateSpot(xCenter, xMax, maxIteration-1);
+      locateSpot(xMin, xCenter, maxIteration-1);
+    }
+  }
+
+  locateSpot(startX+1, worldSize[0]-1, 8);
+  for (var i=0; i<spots.length; ++i) {
+    var animal = new Animal(spots[i], 0);
+    animal.d = -1;
+    animals.push(animal);
+  }
+
   for (i = 0; i < worldPixelBuf.length; ++i) {
     affectColor(worldPixelRawBuf, 4 * i, worldPixelBuf[i]);
   }
@@ -865,16 +914,21 @@ function rechunk (fromX, toX) {
 }
 
 function checkRechunk () {
+  var alives = [];
+  for (var i=0; i<animals.length; ++i) {
+    if (!animals[i].d) alives.push(animals[i]);
+  }
   var minX, maxX;
-  if (animals.length == 0) {
+  if (alives.length == 0) {
     minX = worldStartX + camera[0] / zoom;
     maxX = worldStartX + (camera[0] + resolution[0]) / zoom;
   }
   else {
     var minX = animals[0].p[0], maxX = minX;
-    for (var i=0; i<animals.length; ++i) {
-      minX = Math.min(animals[i].p[0], minX);
-      maxX = Math.max(animals[i].p[0], maxX);
+    for (var i=0; i<alives.length; ++i) {
+      var animal = animals[i];
+      minX = Math.min(animal.p[0], minX);
+      maxX = Math.max(animal.p[0], maxX);
     }
   }
   var windowInf = Math.max(worldStartX, worldWindow * Math.floor(minX / worldWindow - 2));
@@ -909,13 +963,13 @@ function init () {
   for (i = 0; i < initialAnimals; ++i) {
     var x = Math.floor(40 + 40 * Math.random());
     var y = tops[x]+1;
-    var a = new Animal([ x, y ], Date.now() + 2000 + 8000 * Math.random());
+    var a = new Animal([ x, y ], Date.now() + 5000 + 8000 * Math.random());
     animals.push(a);
   }
 }
 
 function gameOver () {
-  localStorage.ibex = Math.max(score, localStorage.ibex||0);
+  localStorage.ibex = Math.max(topScore, localStorage.ibex||0);
   setTimeout(function () {
     onclick = location.reload;
   }, 2000);
@@ -982,20 +1036,40 @@ function render () {
   keyDraw();
   var drawing = draw;
   update();
+
+  // Update Animals
   var centerAnimals = [0,0];
-  for (var i=0; i<animals.length; i++) {
-    centerAnimals[0] += animals[i].p[0];
-    centerAnimals[1] += animals[i].p[1];
+  for (i=0; i<animals.length; i++) {
+    var self = animals[i];
+    if (!self.d) {
+      centerAnimals[0] += self.p[0];
+      centerAnimals[1] += self.p[1];
+    }
+    else if (self.d<0) {
+      for (j=0; j<animals.length; j++) {
+        var other = animals[j];
+        if (!other.d && distance(self.p, other.p) < 4) {
+          self.d = 0;
+          break;
+        }
+      }
+    }
   }
   centerAnimals[0] /= animals.length;
   centerAnimals[1] /= animals.length;
+  alive = 0;
+  toRescue = 0;
   for (var i=0; i<animals.length;) {
     var animal = animals[i];
     animalUpdate(animal, centerAnimals);
     if (!animal.d) {
       topScore = Math.max(topScore, Math.floor(animal.p[0]));
+      alive ++;
     }
-    if (animal.d && Date.now() - animal.T > 3000) {
+    else if (animal.d < 0) {
+      toRescue ++;
+    }
+    if (animal.d<0 && animal.p[0]<worldStartX || animal.d>0 && Date.now() - animal.T > 3000) {
       animals.splice(i, 1);
     }
     else {
@@ -1005,7 +1079,7 @@ function render () {
 
   score = score + 0.01*(topScore-score);
 
-  if (started && !animals.length) {
+  if (started && !alive) {
     if (!gameover) {
       gameOver();
     }
@@ -1044,6 +1118,8 @@ function render () {
   gl.uniform2fv(resolutionL, resolution);
   gl.uniform2fv(renderWorldSizeL, worldSize);
   gl.uniform1f(renderTimeL, time);
+  gl.uniform1f(renderAliveL, alive);
+  gl.uniform1f(renderToRescueL, toRescue);
   gl.uniform1f(renderZoomL, zoom);
   gl.uniform2fv(cameraL, camera);
   gl.uniform2fv(mouseL, mouse);

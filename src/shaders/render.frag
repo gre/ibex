@@ -15,8 +15,10 @@ uniform float score;
 
 uniform float time;
 uniform sampler2D state;
-uniform float animals[7 * 20]; // array of [x, y, vx, vy, deathReason, deathTime, slope]
+uniform float animals[7 * 30]; // array of [x, y, vx, vy, deathReason, deathTime, slope]
 uniform int animalsLength;
+uniform float alive;
+uniform float toRescue;
 uniform sampler2D tiles;
 
 uniform float drawRadius;
@@ -24,6 +26,14 @@ uniform int drawObject;
 
 float rand(vec2 co){
   return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+bool between (float p, float a, float b) {
+  return a <= p && p <= b;
+}
+bool between (vec2 p, vec2 a, vec2 b) {
+  return a.x <= p.x && p.x <= b.x &&
+         a.y <= p.y && p.y <= b.y;
 }
 
 // Digits display source: http://glslsandbox.com/e#19207.5
@@ -95,15 +105,19 @@ vec4 animal (vec2 p, vec2 pos, vec2 v, float d, float T, float s, float size) {
     mix(1., 8., pow(smoothstep(1.0, 6.0, time-T), 0.6))
     : vec2(0.0);
 
+  float sleepCycle = step(0.5, fract(time / 2.0));
+
   // if (distance(p, pos) < 1.0) return vec4(1.0, 0.0, 0.0, 1.0); // DEBUG
 
   // The tile to use
-  float tile = abs(v.x) < 0.1 ? 0.0 : 1.0 + floor(mod(pos.x / size, 3.0));
+  float tile = abs(v.x) < 0.1 ?
+    (d<0.0 ? 5.0 + sleepCycle : 0.0)
+    : 1.0 + floor(mod(pos.x / (2.0*size), 4.0));
 
   // pos: relative position & scaled to size
   pos = (disp + p - pos) / size;
   // Invert in X according to velocity
-  if (v.x > 0.0) pos.x = -pos.x;
+  if (v.x >= 0.0) pos.x = -pos.x;
   // Slope deform the animal
   float slope = clamp(s, -2., 2.) * smoothstep(0.0, 4.0, pos.x);
   // Translate to the pivot
@@ -111,17 +125,28 @@ vec4 animal (vec2 p, vec2 pos, vec2 v, float d, float T, float s, float size) {
   // Scale to the tile width (to match the same pixel world dimension)
   pos /= 8.0;
 
-  // When out of bound, return nothing
-  if (pos.x <= 0.0 || pos.y <= 0.0 || pos.x >= 1.0 || pos.y >= 1.0) return vec4(0.0);
+  vec4 clr = vec4(0.0);
 
-  // Compute the position from where to lookup in tiles
-  vec2 uv =
-    mix(
-      vec2(0.0, (1.0+tile) / 4.0), // uv to
-      vec2(1.0, tile / 4.0), // uv from
-      pos // the position
-    );
-  vec4 clr = texture2D(tiles, uv);
+  if (between(pos, vec2(0.0), vec2(1.0))) {
+    // Compute the position from where to lookup in tiles
+    clr += texture2D(tiles, mix(
+        vec2(0.0, (1.0+tile) / 8.0), // uv to
+        vec2(1.0, tile / 8.0), // uv from
+        pos // the position
+      ));
+  }
+
+  if (d<0.0) {
+    tile = 7.0;
+    vec2 p2 = pos * (sleepCycle+1.5) + vec2(0.8, -1.0);
+    if (between(p2, vec2(0.0), vec2(1.0))) {
+      clr += (1.0 + 0.5 * sleepCycle) * texture2D(tiles, mix(
+        vec2(1.0, (1.0+tile) / 8.0), // uv to
+        vec2(0.0, tile / 8.0), // uv from
+        p2 // the position
+      ));
+    }
+  }
 
   return d>0.0 ? vec4(vec3(0.3 + 1.2 * length(clr.rgb), 0.2, 0.1), smoothstep(3.0, 1.5, time-T) * clr.a) : clr;
 }
@@ -234,10 +259,6 @@ float rect (vec2 p, float border, vec2 a, vec2 b) {
   return float(inRect(p, a, b) && !inRect(p, a+border, b-border));
 }
 
-float manhattan (vec2 a, vec2 b) {
-  return abs(a.x-b.x) + abs(a.y-b.y);
-}
-
 vec4 radar (vec2 p, vec2 from, vec2 to) {
   vec4 boundsRes = bounds(from, to);
   from = boundsRes.xy;
@@ -255,19 +276,24 @@ vec4 radar (vec2 p, vec2 from, vec2 to) {
   vec2 cameraA = from + cameraBoundsRes.xy;
   vec2 cameraB = from + cameraBoundsRes.zw;
 
-  float nbAnimals = 0.0;
-  for (int i=0; i<20; ++i) { if (i >= animalsLength) break;
-    float dist = manhattan(vec2(animals[7*i+0], animals[7*i+1]), statePos);
-    nbAnimals += float(dist <= 8.0);
+  float animalInGroup = 0.0;
+  float animalToBeRescue = 0.0;
+  for (int i=0; i<30; ++i) { if (i >= animalsLength) break;
+    float dist = distance(vec2(animals[7*i+0], animals[7*i+1]), statePos);
+    if (animals[7*i+4] < 0.0)
+      animalToBeRescue += float(dist <= 6.0);
+    else
+      animalInGroup += float(dist <= 4.0);
   }
 
   vec4 bg =
-    vec4(pixel.rgb * 1.2 + 0.2, 1.0);
+    vec4(mix(colors[0], pixel.rgb, 0.7), 1.0);
 
   vec4 front =
-    float(nbAnimals > 0.0) * vec4(0.0, 0.0, 0.0, 1.0)
+    float(animalInGroup > 0.0) * vec4(1.0, 1.0, 0.0, 1.0)
+    + float(animalToBeRescue > 0.0) * vec4(1.0, 0.2, 0.2, 1.0)
     + rect(p, 1.0, from, to) * vec4(1.0, 1.0, 1.0, 1.0)
-    + rect(p, 1.0, cameraA, cameraB) * vec4(0.3, 0.3, 0.3, 1.0);
+    + rect(p, 1.0, cameraA, cameraB) * vec4(1.0, 1.0, 1.0, 0.5);
 
   vec4 c = mix(bg, front, front.a);
   return vec4(c.rgb, c.a * 0.8);
@@ -326,9 +352,7 @@ void main () {
   vec3 pixelColor = -vec3(0.03) * (pixelPos.x - pixelPos.y);
 
   vec4 animalsColor = vec4(0.0);
-  float alive = 0.0;
-  for (int i=0; i<20; ++i) { if (i >= animalsLength) break;
-    alive ++;
+  for (int i=0; i<30; ++i) { if (i >= animalsLength) break;
     vec4 c = animal(
         statePos,
         vec2(
@@ -383,12 +407,20 @@ void main () {
 
     float divider = 150.0;
     float counterMult = 0.015 * resolution.x;
-    vec2 counterPos = p - resolution + vec2(3.0 * counterMult, 0.0);
-    vec4 scoreAnimal = animal(p, resolution - vec2(2.0, 3.0) * counterMult, vec2(0.0), 0.0, 0.0, 0.0, 0.3 * counterMult);
-    c = mix(c, scoreAnimal.rgb + 0.3 * (1.0-c), scoreAnimal.a);
+    vec2 counterPos = p - resolution + vec2(4.0 * counterMult, 0.0);
+    vec4 scoreAnimal = animal(p, resolution - vec2(2.0, 2.6) * counterMult, vec2(0.0), 0.0, 0.0, 0.0, 0.3 * counterMult);
+    c = mix(c, scoreAnimal.rgb + 0.2 * (1.0-c), scoreAnimal.a);
 
     if (number2(alive, (counterPos/resolution) * divider * vec2(1,resolution.y/resolution.x)) > 0.0) {
       c = 0.3 + 0.7 * (1.0-c);
+    }
+
+    counterPos += vec2(0.0, 4.0 * counterMult);
+    scoreAnimal = animal(p, resolution - vec2(2.0, 6.6) * counterMult, vec2(0.0), -1.0, 0.0, 0.0, 0.3 * counterMult);
+    c = mix(c, scoreAnimal.rgb + 0.2 * (1.0-c), scoreAnimal.a);
+
+    if (number2(toRescue, (counterPos/resolution) * divider * vec2(1,resolution.y/resolution.x)) > 0.0) {
+      c = vec3(1.0, 0.0, 0.0) + 0.5 * (1.0-c);
     }
 
     vec2 radarSize = vec2(resolution.y / 6.0) * vec2(worldSize.x/worldSize.y, 1.0);
