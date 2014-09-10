@@ -146,7 +146,7 @@ C.addEventListener("mousemove", function (e) {
   if (!started || gameover) return;
   var selectElP = uiSelectElement(mouse = posE(e));
 
-  C.style.cursor = dragStart ? (!dragCam ? "none" : "move") : (isCursor(p)||selectElP!=-1 ? "pointer" : "default");
+  C.style.cursor = dragStart ? (!dragCam ? "none" : "move") : (isCursor(mouse)||selectElP!=-1 ? "pointer" : "default");
 
   if (dragStart) {
     var dx = mouse[0] - dragStart[0];
