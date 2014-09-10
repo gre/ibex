@@ -17,7 +17,7 @@ tiles.src = "t.png";
 
 // in milliseconds
 var updateRate = 35;
-var refreshWorldRate = 200;
+var refreshWorldRate = 400;
 var initialAnimals = 20;
 
 var colors = [
@@ -159,30 +159,11 @@ C.addEventListener("mousemove", function (e) {
     if (dragCam) {
       setCam([ dragCam[0] - dx, dragCam[1] - dy ]);
     }
-    else {
-      /*
-      var d = dist(dragStart, p);
-      if (d > 0 * 60) {
-        dragCam = [ camera[0] + dx, camera[1] + dy ];
-        C.style.cursor = "move";
-      }
-      if (d > 10) {
-        drawObject = 2 * (dy < 0) + (dx > 0);
-        C.style.cursor = "pointer";
-      }
-      else {
-        drawObject = -1;
-        C.style.cursor = "default";
-      }
-      */
-    }
-
   }
   else {
     keyDraw();
   }
 });
-
 
 
 // Keyboard
@@ -547,7 +528,6 @@ var renderDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
 
 var cameraL = gl.getUniformLocation(program, "camera");
 var mouseL = gl.getUniformLocation(program, "mouse");
-//var dragStartL = gl.getUniformLocation(program, "dragStart");
 var enableCursorL = gl.getUniformLocation(program, "enableCursor");
 var resolutionL = gl.getUniformLocation(program, "resolution");
 
@@ -882,7 +862,6 @@ function render () {
   gl.uniform1f(renderZoomL, zoom);
   gl.uniform2fv(cameraL, camera);
   gl.uniform2fv(mouseL, mouse);
-  //if (dragStart) gl.uniform2fv(dragStartL, dragStart);
   gl.uniform1i(enableCursorL, !!dragStart && !dragCam);
   gl.uniform1i(renderStartedL, started);
   gl.uniform1i(renderGameOverL, gameover);
@@ -908,7 +887,7 @@ function start () {
   started = 1;
   init();
 
-  cameraV[1] = 3;
+  cameraV[1] = 4;
   var camT = Date.now();
   (function check () {
     if (Date.now() - camT > 5000 || camera[1] + resolution[1] >= worldSize[1] * zoom) {
