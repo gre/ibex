@@ -15,7 +15,7 @@ uniform float score;
 
 uniform float time;
 uniform sampler2D state;
-uniform float animals[8 * 20]; // array of [x, y, vx, vy, size, deathReason, deathTime, slope]
+uniform float animals[7 * 20]; // array of [x, y, vx, vy, deathReason, deathTime, slope]
 uniform int animalsLength;
 uniform sampler2D tiles;
 
@@ -87,7 +87,7 @@ float number2 (float n, vec2 p) {
 }
 
 
-vec4 animal (vec2 p, vec2 pos, vec2 v, float size, float d, float T, float s) {
+vec4 animal (vec2 p, vec2 pos, vec2 v, float d, float T, float s, float size) {
   // Died displacement
   vec2 disp = d>0.0 ?
     (1.0 + v - mix(vec2(0.0), v, pow(smoothstep(0.0, 0.5, time-T), 0.3))) +
@@ -105,7 +105,7 @@ vec4 animal (vec2 p, vec2 pos, vec2 v, float size, float d, float T, float s) {
   // Invert in X according to velocity
   if (v.x > 0.0) pos.x = -pos.x;
   // Slope deform the animal
-  float slope = clamp(s, -3., 3.) * smoothstep(0.0, 4.0, pos.x);
+  float slope = clamp(s, -2., 2.) * smoothstep(0.0, 4.0, pos.x);
   // Translate to the pivot
   pos += vec2(3.5, slope);
   // Scale to the tile width (to match the same pixel world dimension)
@@ -145,8 +145,15 @@ vec3 colorFor (int e) {
   return colors[8];
 }
 
-vec3 stateColorPass (float cel, vec2 pos) {
-  int e = int(floor(.5 + 9. * cel));
+int getState (vec2 pos) {
+  vec2 uv = (floor(pos) + 0.5) / worldSize;
+  bool outOfBound = uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0;
+  if (outOfBound) return pos.y < 0.0 ? 1 : 0;
+  float cel = texture2D(state, uv).r;
+  return int(floor(.5 + 9. * cel));
+}
+
+vec3 stateColorPass (int e, vec2 pos) {
   return (e==8 ? mix(1.0, rand(pos), 0.2) : 1.0) * colorFor(e);
 }
 
@@ -210,6 +217,62 @@ vec4 elements (vec2 p, vec3 clr) {
   return vec4(0.0);
 }
 
+vec4 bounds (vec2 from, vec2 to) {
+  float x1 = min(from.x, to.x);
+  float x2 = max(from.x, to.x);
+  float y1 = min(from.y, to.y);
+  float y2 = max(from.y, to.y);
+  return vec4(x1, y1, x2, y2);
+}
+
+bool inRect (vec2 p, vec2 a, vec2 b) {
+  return a.x <= p.x && p.x <= b.x &&
+         a.y <= p.y && p.y <= b.y;
+}
+
+float rect (vec2 p, float border, vec2 a, vec2 b) {
+  return float(inRect(p, a, b) && !inRect(p, a+border, b-border));
+}
+
+float manhattan (vec2 a, vec2 b) {
+  return abs(a.x-b.x) + abs(a.y-b.y);
+}
+
+vec4 radar (vec2 p, vec2 from, vec2 to) {
+  vec4 boundsRes = bounds(from, to);
+  from = boundsRes.xy;
+  to = boundsRes.zw;
+  if (!inRect(p, from, to)) return vec4(0.0);
+
+  vec2 radarSize = to - from;
+  vec2 uv = (p - from) / radarSize;
+  vec2 statePos = worldSize * uv;
+  int e = getState(statePos);
+  vec3 pixel = colorFor(e);
+
+  vec2 realSize = worldSize * zoom;
+  vec4 cameraBoundsRes = bounds(radarSize * camera / realSize, radarSize * (camera+resolution) / realSize);
+  vec2 cameraA = from + cameraBoundsRes.xy;
+  vec2 cameraB = from + cameraBoundsRes.zw;
+
+  float nbAnimals = 0.0;
+  for (int i=0; i<20; ++i) { if (i >= animalsLength) break;
+    float dist = manhattan(vec2(animals[7*i+0], animals[7*i+1]), statePos);
+    nbAnimals += float(dist <= 8.0);
+  }
+
+  vec4 bg =
+    vec4(pixel.rgb * 1.2 + 0.2, 1.0);
+
+  vec4 front =
+    float(nbAnimals > 0.0) * vec4(0.0, 0.0, 0.0, 1.0)
+    + rect(p, 1.0, from, to) * vec4(1.0, 1.0, 1.0, 1.0)
+    + rect(p, 1.0, cameraA, cameraB) * vec4(0.3, 0.3, 0.3, 1.0);
+
+  vec4 c = mix(bg, front, front.a);
+  return vec4(c.rgb, c.a * 0.8);
+}
+
 void main () {
   vec2 p = gl_FragCoord.xy;
   vec2 disp = vec2(0.0);
@@ -238,12 +301,6 @@ void main () {
     disp += dispPass(1.0, 0.1, 2.0);
   }
 
-/*
-  if (drawing) {
-    disp += dispPass(3.0 * pow(smoothstep(zoom * drawRadius, 0.0, distance(gl_FragCoord.xy, mouse)), 0.5), 0.2, 5.0);
-  }
-  */
-
   float uiMatchAlpha = 0.0;
   if (started && !gameover) {
     uiMatchAlpha = cursorUI(p, vec3(0.0)).a;
@@ -255,12 +312,7 @@ void main () {
   // Compute where the camera/zoom is in the state texture
   vec2 statePos = (p + disp + camera) / zoom;
   vec2 statePosFloor = floor(statePos);
-  vec2 stateBound = worldSize;
-  vec2 uv = (statePosFloor + 0.5) / stateBound;
-  bool outOfBound = uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0;
-  vec3 stateColor = outOfBound ?
-    (statePos.y < 0.0 ? colors[1] : colors[0]) :
-    stateColorPass(texture2D(state, uv).r, statePosFloor);
+  vec3 stateColor = stateColorPass(getState(statePosFloor), statePosFloor);
 
   vec2 pixelPos = fract(statePos);
 
@@ -273,54 +325,41 @@ void main () {
   );
   vec3 pixelColor = -vec3(0.03) * (pixelPos.x - pixelPos.y);
 
-  if (!outOfBound) {
-    vec4 animalsColor = vec4(0.0);
-    for (int i=0; i<20; ++i) { if (i >= animalsLength) break;
-      vec4 c = animal(
-          statePos,
-          vec2(
-          animals[8*i+0],
-          animals[8*i+1]),
-          vec2(
-          animals[8*i+2],
-          animals[8*i+3]),
-          animals[8*i+4],
-          animals[8*i+5],
-          animals[8*i+6],
-          animals[8*i+7]);
+  vec4 animalsColor = vec4(0.0);
+  float alive = 0.0;
+  for (int i=0; i<20; ++i) { if (i >= animalsLength) break;
+    alive ++;
+    vec4 c = animal(
+        statePos,
+        vec2(
+        animals[7*i+0],
+        animals[7*i+1]),
+        vec2(
+        animals[7*i+2],
+        animals[7*i+3]),
+        animals[7*i+4],
+        animals[7*i+5],
+        animals[7*i+6],
+        1.0);
 
-      if (c.a > 0.0) {
-        animalsColor = c;
-        break;
-      }
+    if (c.a > 0.0) {
+      animalsColor = c;
+      break;
     }
-    vec3 worldColor = c + noiseColor + pixelColor;
-    c = animalsColor.a==0.0 ? worldColor : mix(worldColor, animalsColor.rgb, min(1.0, animalsColor.a));
   }
+  vec3 worldColor = c + noiseColor + pixelColor;
+  c = animalsColor.a==0.0 ? worldColor : mix(worldColor, animalsColor.rgb, min(1.0, animalsColor.a));
 
   c = mix(c, statePos.y < 0.0 ? colors[1] : colors[0], smoothstep(worldSize[0]-100.0, worldSize[0], statePos[0]));
 
-/*
-  if (drawing) {
-    clr = cursor(distance(statePosFloor, floor((mouse + camera)/zoom)) / drawRadius, colorFor(drawObject));
-    c = mix(c.rgb, clr.rgb, clr.a);
-  }
-  */
-  
   if (uiMatchAlpha > 0.0) {
     clr = cursorUI(p, c);
     c = mix(c.rgb, clr.rgb, clr.a);
   }
 
-  clr = elements(p, c);
-  c = mix(c.rgb, clr.rgb, clr.a);
-
   if (!started || gameover) {
     if (lgo) {
       c = 1.4 * (0.2 + 0.8*c);
-      if (!started && distance(resolution / 2.0 /  grad, mouse /  grad) < 0.6) {
-        c *= 1.2;
-      }
     }
     else if (logo(gl_FragCoord.xy, logoP+vec2(8.0, -8.0), s)) {
       c = vec3(0.0);
@@ -335,19 +374,27 @@ void main () {
     scorePos -= (resolution - resolution / vec2(6.0, 36.0)) / 2.;
   }
   if (number6(score, (scorePos/resolution) * 128. * vec2(1,resolution.y/resolution.x)) > 0.0) {
-    c = 0.1 + 0.9 * (1.0-c);
+    c = float(!started)*vec3(1.0, 0.2, 0.0) + 0.2 + 0.5 * (1.0-c);
   }
 
   if (!gameover && started) {
+    clr = elements(p, c);
+    c = mix(c.rgb, clr.rgb, clr.a);
+
     float divider = 150.0;
     float counterMult = 0.015 * resolution.x;
     vec2 counterPos = p - resolution + vec2(3.0 * counterMult, 0.0);
-    vec4 scoreAnimal = animal(p, resolution - vec2(2.0, 3.0) * counterMult, vec2(0.0), 0.3 * counterMult, 0., 0., 0.0);
+    vec4 scoreAnimal = animal(p, resolution - vec2(2.0, 3.0) * counterMult, vec2(0.0), 0.0, 0.0, 0.0, 0.3 * counterMult);
     c = mix(c, scoreAnimal.rgb + 0.3 * (1.0-c), scoreAnimal.a);
 
-    if (number2(float(animalsLength), (counterPos/resolution) * divider * vec2(1,resolution.y/resolution.x)) > 0.0) {
+    if (number2(alive, (counterPos/resolution) * divider * vec2(1,resolution.y/resolution.x)) > 0.0) {
       c = 0.3 + 0.7 * (1.0-c);
     }
+
+    vec2 radarSize = vec2(resolution.y / 6.0) * vec2(worldSize.x/worldSize.y, 1.0);
+    vec2 radarFrom = vec2(10.0, resolution.y - 10.0);
+    clr = radar(p, radarFrom, radarFrom + radarSize * vec2(1.0, -1.0));
+    c = mix(c, clr.rgb, clr.a);
   }
   
   gl_FragColor = vec4(c, 1.0);

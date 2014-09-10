@@ -10,7 +10,7 @@
     "minify": "uglifyjs build/build.js -c --screw-ie8 -m -o build/build.min.js",
     "nominify": "cp build/build.js build/build.min.js",
     "gen": "cp assets/tiles.png target/t.png && cp src/target.html target/index.html && cp build/build.min.js target/b.js",
-    "build": "npm run cleanall && npm run compileglsl && npm run tmpljs && npm run minify && npm run gen",
+    "build": "npm run cleanall && npm run compileglsl && npm run tmpljs && npm run nominify && npm run gen",
     "watch": "npm run build; wr 'npm run build' src/ assets/"
   },
   "repository": {

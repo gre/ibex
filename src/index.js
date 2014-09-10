@@ -2,23 +2,24 @@ var x, y, i, j;
 
 ////// Game constants / states /////
 
-var uiBrushSize = 6;
+uiBrushSize = 6;
 
-var seed = Math.random();
-var C = document.createElement("canvas");
+seed = Math.random();
+C = document.createElement("canvas");
 
-var started = 0;
-var gameover = 0;
-var score = 0;
-var tiles = new Image();
+started = 0;
+gameover = 0;
+score = topScore = +(localStorage.ibex || 0);
+tiles = new Image();
 tiles.src = "t.png";
 
 // in milliseconds
-var updateRate = 35;
-var refreshWorldRate = 200;
-var initialAnimals = 8;
+updateRate = 35;
+refreshWorldRate = 500;
 
-var colors = [
+initialAnimals = 8;
+
+colors = [
   0.11, 0.16, 0.23, // 0: air
   0.74, 0.66, 0.51, // 1: earth
   0.84, 0.17, 0.08, // 2: fire
@@ -33,31 +34,31 @@ var colors = [
   0.20, 0.60, 0.20   // 8: grass (forest)
 ];
 
-var camAutoSpeed = 4;
-var camAutoThreshold = 160;
+camAutoSpeed = 4;
+camAutoThreshold = 160;
 
-var tick = 0;
-var startTick = 0;
-var worldRefreshTick = 0;
-var worldWindow = 90; // The size of the world chunk window in X
-var worldSize = [ 3 * worldWindow, 256 ];
-var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
-var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
-var worldStartX = 0;
+tick = 0;
+startTick = 0;
+worldRefreshTick = 0;
+worldWindow = 90; // The size of the world chunk window in X
+worldSize = [ 3 * worldWindow, 256 ];
+worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
+worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
+worldStartX = 0;
 
-var resolution;
-var zoom;
-var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
-var cameraV = [0, 0 ];
-var mouse = [ 0, 0 ];
+// resolution
+// zoom
+camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
+cameraV = [0, 0 ];
+mouse = [ 0, 0 ];
 
-var draw = 0;
-var drawPosition;
-var drawObject = 1;
-var drawRadius = uiBrushSize;
-var buttons = [0,0,0,0];
+draw = 0;
+// drawPosition
+drawObject = 1;
+drawRadius = uiBrushSize;
+buttons = [0,0,0,0];
 
-var animals = [];
+animals = [];
 
 //////// Game events /////
 
@@ -243,17 +244,15 @@ var sightw = 32,
     sighthalfw = sightw / 2,
     sighthalfh = sighth / 2;
 
-function Animal (initialPosition, size, dt) {
+function Animal (initialPosition, dt) {
+  var self = this;
   // p: position, t: targetted position
-  this.p = initialPosition;
-  this.t = [];
+  self.p = initialPosition;
+  self.t = [];
   // v: velocity
-  this.v = [0, 0];
-  // b: The buffer of the animal is its vision
-  this.b = new Uint8Array(sightw * sighth);
+  self.v = [0, 0];
   // dt: next decision time
-  this.dt = dt;
-  this.s = size;
+  self.dt = dt;
 
   // this.d <- died flag
   // this.T <- death time
@@ -886,8 +885,8 @@ function checkRechunk () {
 
   if (fromX || (toX-fromX) - worldSize[0]) {
     rechunk(fromX, toX);
+    return 1;
   }
-  
 }
 
 //////////// RUN THE GAME /////////////////
@@ -906,11 +905,11 @@ for (x=0; x<100; ++x) {
 }
 
 function init () {
-
+  topScore = 0;
   for (i = 0; i < initialAnimals; ++i) {
-    var x = Math.floor(40 + 60 * Math.random());
+    var x = Math.floor(40 + 40 * Math.random());
     var y = tops[x]+1;
-    var a = new Animal([ x, y ], 1, Date.now() + 2000 + 8000 * Math.random());
+    var a = new Animal([ x, y ], Date.now() + 2000 + 8000 * Math.random());
     animals.push(a);
   }
 }
@@ -918,7 +917,7 @@ function init () {
 function gameOver () {
   localStorage.ibex = Math.max(score, localStorage.ibex||0);
   setTimeout(function () {
-    onclick = location.reload();
+    onclick = location.reload;
   }, 2000);
 }
 
@@ -946,9 +945,6 @@ function update () {
   if (!needRead && now-lastUpdate < updateRate) return;
   lastUpdate = now;
   gl.useProgram(logicProgram);
-  if (needRead) {
-    checkRechunk();
-  }
   gl.uniform2fv(logicSizeL, worldSize);
   gl.uniform1f(logicTickL, tick);
   gl.uniform1f(logicWorldStartL, worldStartX);
@@ -970,6 +966,10 @@ function update () {
     lastRefreshWorld = now;
     gl.readPixels(0, 0, worldSize[0], worldSize[1], gl.RGBA, gl.UNSIGNED_BYTE, worldPixelRawBuf);
     parseColors(worldPixelRawBuf, worldPixelBuf);
+    if (checkRechunk()) {
+      gl.readPixels(0, 0, worldSize[0], worldSize[1], gl.RGBA, gl.UNSIGNED_BYTE, worldPixelRawBuf);
+      parseColors(worldPixelRawBuf, worldPixelBuf);
+    }
     worldRefreshTick ++;
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -977,7 +977,6 @@ function update () {
   tick ++;
 }
 
-var topScore = 0;
 function render () {
   requestAnimationFrame(render);
   keyDraw();
@@ -1029,14 +1028,15 @@ function render () {
     var animal = animals[i];
     var statBack = animal.v[0] > 0 ? animal.sl : animal.sr;
     var slope = statBack[0].f+1==sighthalfh && statBack[3].a ? statBack[0].f - statBack[3].f : 0;
-    animalsData.push(animal.p[0] - worldStartX);
-    animalsData.push(animal.p[1]);
-    animalsData.push(animal.v[0]);
-    animalsData.push(animal.v[1]);
-    animalsData.push(animal.s);
-    animalsData.push(animal.d);
-    animalsData.push((animal.T-startTime)/1000);
-    animalsData.push(slope);
+    animalsData.push(
+      animal.p[0] - worldStartX,
+      animal.p[1],
+      animal.v[0],
+      animal.v[1],
+      animal.d,
+      (animal.T-startTime)/1000,
+      slope
+    );
   }
 
   var time = (Date.now()-startTime)/1000;
