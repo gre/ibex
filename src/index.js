@@ -46,9 +46,6 @@ var colors = [
   0.20, 0.60, 0.20   // 8: grass (forest)
 ];
 
-var camAutoSpeed = 4;
-var camAutoThreshold = 160;
-
 var tick = 0;
 var startTick = 0;
 var worldRefreshTick = 0;
@@ -60,20 +57,20 @@ var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
 var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
 var worldStartX = 0;
 
-// resolution
-// zoom
+var resolution;
+var zoom;
 var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
 var cameraV = [0, 0 ];
 var mouse = [ 0, 0 ];
 
 var draw = 0;
-// drawPosition
+var drawPosition;
 var drawObject = 1;
 var drawRadius = uiBrushSize;
-var buttons = [0,0,0,0];
 
 var animals = [];
-var alive = toRescue = 0;
+var alive;
+var toRescue;
 
 //////// Game events /////
 
