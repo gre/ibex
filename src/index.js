@@ -92,10 +92,8 @@ function distance (a, b) {
   return Math.sqrt(dx*dx+dy*dy);
 }
 
-var dragStart, dragCam, camStart, dragElement, selectElStart;
-
 function resetMouse () {
-  camStart = dragStart = dragCam = 0;
+  camStart = dragStart = dragCam = selectElStart = 0;
   C.style.cursor = started ? "default" : "pointer";
 }
 resetMouse();
@@ -135,9 +133,8 @@ C.addEventListener("mousedown", function (e) {
 C.addEventListener("mouseup", function (e) {
   if (!started) start();
   if (!started || gameover) return;
-  var p = posE(e);
   if (selectElStart != -1) {
-    var selectElP = uiSelectElement(p);
+    var selectElP = uiSelectElement(posE(e));
     if (selectElStart == selectElP) {
       drawObject = selectElStart;
     }
@@ -147,15 +144,13 @@ C.addEventListener("mouseup", function (e) {
 
 C.addEventListener("mousemove", function (e) {
   if (!started || gameover) return;
-  var p = posE(e);
-  mouse = p;
-  var selectElP = uiSelectElement(p);
+  var selectElP = uiSelectElement(mouse = posE(e));
 
   C.style.cursor = dragStart ? (!dragCam ? "none" : "move") : (isCursor(p)||selectElP!=-1 ? "pointer" : "default");
 
   if (dragStart) {
-    var dx = p[0] - dragStart[0];
-    var dy = p[1] - dragStart[1];
+    var dx = mouse[0] - dragStart[0];
+    var dy = mouse[1] - dragStart[1];
 
     if (dragCam) {
       setCam([ camStart[0] - dx, camStart[1] - dy ]);
@@ -851,7 +846,6 @@ function generate (startX) {
     if (!maxIteration || nbSpots <= spots.length) return;
     var xCenter = Math.floor(xMin+(xMax-xMin)/2);
     var airOnTop = 0;
-    var found = [];
     for (
       y = Math.floor(rescueSpawnMaxY - Math.random() * (rescueSpawnMaxY-rescueSpawnMinY)); // Not always spawn from the top
       y > rescueSpawnMinY;
