@@ -874,11 +874,13 @@ function generate (startX) {
     }
   }
 
-  locateSpot(startX+1, worldSize[0]-1, 8);
-  for (var i=0; i<spots.length; ++i) {
-    var animal = new Animal(spots[i], 0);
-    animal.d = -1;
-    animals.push(animal);
+  if (startX) {
+    locateSpot(startX+1, worldSize[0]-1, 8);
+    for (var i=0; i<spots.length; ++i) {
+      var animal = new Animal(spots[i], 0);
+      animal.d = -1;
+      animals.push(animal);
+    }
   }
 
   for (i = 0; i < worldPixelBuf.length; ++i) {
@@ -1048,7 +1050,7 @@ function render () {
     else if (self.d<0) {
       for (j=0; j<animals.length; j++) {
         var other = animals[j];
-        if (!other.d && distance(self.p, other.p) < 4) {
+        if (!other.d && distance(self.p, other.p) < 6) {
           self.d = 0;
           break;
         }

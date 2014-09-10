@@ -140,7 +140,7 @@ vec4 animal (vec2 p, vec2 pos, vec2 v, float d, float T, float s, float size) {
     tile = 7.0;
     vec2 p2 = pos * (sleepCycle+1.5) + vec2(0.8, -1.0);
     if (between(p2, vec2(0.0), vec2(1.0))) {
-      clr += (1.0 + 0.5 * sleepCycle) * texture2D(tiles, mix(
+      clr += vec4(vec3(1.0), 0.7 + 0.3 * sleepCycle) * texture2D(tiles, mix(
         vec2(1.0, (1.0+tile) / 8.0), // uv to
         vec2(0.0, tile / 8.0), // uv from
         p2 // the position
@@ -409,7 +409,7 @@ void main () {
     float counterMult = 0.015 * resolution.x;
     vec2 counterPos = p - resolution + vec2(4.0 * counterMult, 0.0);
     vec4 scoreAnimal = animal(p, resolution - vec2(2.0, 2.6) * counterMult, vec2(0.0), 0.0, 0.0, 0.0, 0.3 * counterMult);
-    c = mix(c, scoreAnimal.rgb + 0.2 * (1.0-c), scoreAnimal.a);
+    c = mix(c, scoreAnimal.rgb + 0.2 - 0.3 * c, scoreAnimal.a);
 
     if (number2(alive, (counterPos/resolution) * divider * vec2(1,resolution.y/resolution.x)) > 0.0) {
       c = 0.3 + 0.7 * (1.0-c);
@@ -417,7 +417,7 @@ void main () {
 
     counterPos += vec2(0.0, 4.0 * counterMult);
     scoreAnimal = animal(p, resolution - vec2(2.0, 6.6) * counterMult, vec2(0.0), -1.0, 0.0, 0.0, 0.3 * counterMult);
-    c = mix(c, scoreAnimal.rgb + 0.2 * (1.0-c), scoreAnimal.a);
+    c = mix(c, scoreAnimal.rgb + 0.2 - 0.3 * c, scoreAnimal.a);
 
     if (number2(toRescue, (counterPos/resolution) * divider * vec2(1,resolution.y/resolution.x)) > 0.0) {
       c = vec3(1.0, 0.0, 0.0) + 0.5 * (1.0-c);

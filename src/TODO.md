@@ -2,23 +2,22 @@ Game Goal
 ===
 - Protect & escort some wild animals into a safe place.
 - end of the world from left to right. rush to the right. infinite exploration.
+- Sleeping ibex in the map! go to wake & rescue them! (population increase, reason to go down)
 
 TODO
 ===
-- Polish game progressive difficulty: volcano propagation increase? hell zone speed increase?
 - Map gen variety:
   - if so, better move to glsl generating?
   - forest areas!!!
   - rarely have water source in caves?
   - rarely have volcanos?
-- Goal: Sleeping ibex in the map! go to wake & rescue them! (population increase, reason to go down)
-- keep score in local storage
-- Audio !
+- Polish game progressive difficulty: volcano propagation increase? hell zone speed increase?
 - Bugfix: implement proper collision detection.
-- Polish: improve animals decisions
-- Polish: animal graphics?
+- Polish: improve animals decisions: avoid suicidal decisions.
+- Audio !
 - Polish: Make sure animals are safe at spawn
 - when left disappear make it blurred?
+
 - Polish: More variety in the design & events
   - season / weather? (rain, thunder)
   - day & night (different styles, illumination?)
@@ -31,6 +30,8 @@ TODO
 Done
 ---
 
+DONE - Polish: animal graphics?
+DONE - keep score in local storage
 DONE - polish gameplay: a central cursor & you switch between mode which make the elements UI slide
 DONE - miniature map (top-left) to visualize where the ibex are & the goal in the map
 DONE - bigger ibex count
