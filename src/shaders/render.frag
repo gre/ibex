@@ -24,6 +24,11 @@ uniform sampler2D tiles;
 uniform float drawRadius;
 uniform int drawObject;
 
+
+float constantAttenuation = 0.0;
+float linearAttenuation = 0.002;
+float quadraticAttenuation = 0.001;
+
 float rand(vec2 co){
   return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
@@ -297,7 +302,7 @@ vec4 radar (vec2 p, vec2 from, vec2 to) {
 
   vec4 front =
     float(animalInGroup > 0.0) * vec4(1.0, 1.0, 0.0, 1.0)
-    + float(animalToBeRescue > 0.0) * vec4(1.0, 0.2, 0.2, 1.0)
+    + float(animalToBeRescue > 0.0) * vec4(0.2, 1.0, 0.2, 1.0)
     + rect(p, 1.0, from, to) * vec4(1.0, 1.0, 1.0, 1.0)
     + rect(p, 1.0, cameraA, cameraB) * vec4(1.0, 1.0, 1.0, 0.5);
 
@@ -358,12 +363,15 @@ void main () {
   vec3 pixelColor = -vec3(0.03) * (pixelPos.x - pixelPos.y);
 
   vec4 animalsColor = vec4(0.0);
+  float animalsDistRev = 0.0;
+
   for (int i=0; i<30; ++i) { if (i >= animalsLength) break;
+    vec2 animalPos = vec2(
+        animals[7*i+0],
+        animals[7*i+1]);
     vec4 c = animal(
         statePos,
-        vec2(
-        animals[7*i+0],
-        animals[7*i+1]),
+        animalPos,
         vec2(
         animals[7*i+2],
         animals[7*i+3]),
@@ -372,15 +380,20 @@ void main () {
         animals[7*i+6],
         1.0);
 
-    if (c.a > 0.0) {
-      animalsColor = c;
-      break;
-    }
+    float dist = distance(
+      animalPos,
+      statePos
+    );
+    animalsDistRev += 1.0 / (constantAttenuation + linearAttenuation * dist + quadraticAttenuation * dist * dist);
+
+    animalsColor = mix(animalsColor, c, c.a);
   }
+
   vec3 worldColor = c + noiseColor + pixelColor;
   c = animalsColor.a==0.0 ? worldColor : mix(worldColor, animalsColor.rgb, min(1.0, animalsColor.a));
-
   c = mix(c, statePos.y < 0.0 ? colors[1] : colors[0], smoothstep(worldSize[0]-100.0, worldSize[0], statePos[0]));
+
+  c *= 0.7 + 0.3 * min(1.0, animalsDistRev);
 
   if (uiMatchAlpha > 0.0) {
     clr = cursorUI(p, c);
@@ -389,13 +402,10 @@ void main () {
 
   if (!started || gameover) {
     if (lgo) {
-      c = 1.4 * (0.2 + 0.8*c);
+      c = 1.4 * (0.4 + 0.8*c);
     }
     else if (logo(gl_FragCoord.xy, logoP+vec2(8.0, -8.0), s)) {
       c = vec3(0.0);
-    }
-    else {
-      c = mix(c.rgb, vec3(0.0), (gameover ? 0.5 : 1.0) * (0.2 + 0.4 * smoothstep(0.4, 1.0, distance(resolution / 2.0 /  grad, gl_FragCoord.xy /  grad))));
     }
   }
 
@@ -404,7 +414,7 @@ void main () {
     scorePos -= (resolution - resolution / vec2(6.0, 36.0)) / 2.;
   }
   if (number6(score, (scorePos/resolution) * 128. * vec2(1,resolution.y/resolution.x)) > 0.0) {
-    c = float(!started)*vec3(1.0, 0.2, 0.0) + 0.4 + 0.3 * (1.0-c);
+    c = float(!started)*vec3(1.0, 0.2, 0.0) + 0.5 + 0.3 * (1.0-c);
   }
 
   if (!gameover && started) {
@@ -418,15 +428,16 @@ void main () {
     c = mix(c, scoreAnimal.rgb + 0.2 - 0.3 * c, scoreAnimal.a);
 
     if (number2(alive, (counterPos/resolution) * divider * vec2(1,resolution.y/resolution.x)) > 0.0) {
-      c = 0.3 + 0.7 * (1.0-c);
+      c = 0.5 + 0.5 * (1.0-c);
     }
 
-    counterPos += vec2(0.0, 4.0 * counterMult);
-    scoreAnimal = animal(p, resolution - vec2(2.0, 7.0) * counterMult, vec2(0.0), -1.0, 0.0, 0.0, 0.3 * counterMult);
-    c = mix(c, scoreAnimal.rgb + 0.2 - 0.3 * c, scoreAnimal.a);
-
-    if (number2(toRescue, (counterPos/resolution) * divider * vec2(1,resolution.y/resolution.x)) > 0.0) {
-      c = vec3(1.0, 0.0, 0.0) + 0.5 * (1.0-c);
+    if (toRescue > 0.0) {
+      counterPos += vec2(0.0, 4.0 * counterMult);
+      scoreAnimal = animal(p, resolution - vec2(2.0, 7.0) * counterMult, vec2(0.0), -1.0, 0.0, 0.0, 0.3 * counterMult);
+      c = mix(c, scoreAnimal.rgb + 0.2 - 0.3 * c, scoreAnimal.a);
+      if (number2(toRescue, (counterPos/resolution) * divider * vec2(1,resolution.y/resolution.x)) > 0.0) {
+        c = vec3(0.0, 1.0, 0.0) + 0.5 * (1.0-c);
+      }
     }
 
     vec2 radarSize = vec2(resolution.y / 6.0) * vec2(worldSize.x/worldSize.y, 1.0);

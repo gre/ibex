@@ -6,8 +6,6 @@ Game Goal
 
 TODO
 ===
-- Audio !
-- mouse wheel to change elements
 - Fix hell trigger position
 - Polish game progressive difficulty: volcano propagation increase? hell zone speed increase?
 
@@ -25,6 +23,8 @@ TODO
 Done
 ---
 
+DONE - mouse wheel to change elements
+DONE - Audio !
 DONE - Bugfix: implement proper collision detection.
 DONE - Polish: improve animals decisions: avoid suicidal decisions.
 DONE - Map gen variety:

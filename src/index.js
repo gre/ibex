@@ -1,25 +1,33 @@
 var x, y, i, j;
 
-var sounds = [
- [0,,0.1812,,0.1349,0.4524,,0.2365,,,,,,0.0819,,,,,1,,,,,0.5]
+var deaths = [
+  [3,,0.45,0.73,0.5,0.08,,0.04,-0.04,0.15,0.05,,,,,,0.3799,0.02,0.08,,0.35,0.65,0.08,0.6], // fall in cliff
+  [3,0.04,0.34,0.76,0.62,0.26,,-0.04,-0.14,0.62,0.35,,,0.33,0.28,,-0.06,0.3799,0.13,-0.0999,,0.28,-0.14,0.2], // stuck in earth
+  [3,0.35,0.67,,0.52,0.12,,,,,,,,,,,0.6799,,0.25,-0.04,,,-0.0999,0.2] // fire
 ].map(jsfxr);
+
+var jumps = [];
+for (i = 0; i < 4; ++i)
+  jumps.push(jsfxr([0,0.03,0.3,0.13,0.2,0.26+i/20,,0.1399,,0.02,0.07,-0.06,,0.42,,,-0.06,-0.02,0.34,0.04,,0.28,0.06,0.2]));
+
+var stepsSounds = [];
+for (i = 0; i < 8; ++i)
+  stepsSounds.push(jsfxr([3,0.16,0.1749,,0.22,0.05+i/9,,-0.16,,,,,,,,,,,0.08,-0.06,,0.8,,0.6]));
+
+var wakeUpSound = jsfxr([1,0.16,0.18,,0.45,0.23,,,0.1,0.37,0.2,0.58,0.44,,,,,,0.3,,0.21,0.15,0.34,0.3]);
+
+var gameoverSound = jsfxr([0,0.11,1,0.22,0.7,0.61,,-0.06,-0.0799,0.21,0.28,-0.04,0.2,0.56,-0.4,,0.28,-0.54,0.1,-0.04,0.52,0.8,-0.02,0.5]);
+var initSound = jsfxr([0,0.11,1,0.22,0.7,0.19,,0.12,0.02,0.29,0.41,-0.26,0.56,0.56,-0.4,,0.28,-0.54,0.24,-0.04,,0.8,-0.02,0.5]);
 
 function play (src, volume) {
   var player = new Audio();
   player.src = src;
-  player.volume = volume;
+  player.volume = volume||1;
   player.play();
 }
 
-function jump (p, v) {
-  var vol = step(200, 100, distance(p, posToWorld(cursorCenterPos())));
-  var d = 0;
-  d += v[0] * v[0];
-  d += v[1] * v[1];
-  d /= 2;
-  var src = jsfxr([0,0.03,0.3,0.13,0.3+0.3*d,0.26,,0.1399,,0.02,0.07,-0.06,,0.42,,,-0.06,-0.02,0.34,0.04,,0.28,0.06,0.35]);
-  console.log("jump", d, vol);
-  return play(src, d, vol);
+function positionVolume (p) {
+  return Math.pow(step(100, 10, distance(p, posToWorld(cursorCenterPos()))), 2.0);
 }
 
 ////// Game constants / states /////
@@ -378,7 +386,7 @@ function animalSyncSight (animal) {
 function animalDie (animal, reason) {
   animal.d = 1+reason;
   animal.T = Date.now();
-  console.log(["falls in a cliff","stuck in earth","burned by fire"][reason], animal);
+  play(deaths[reason], positionVolume(animal.p));
 }
 
 function animalUpdate (animal, center) {
@@ -597,6 +605,7 @@ function animalUpdate (animal, center) {
         if (!dirS[0].a || a > 0 && b <= animal.p[0] || a < 0 && b >= animal.p[0]) {
           animal.v[0] = 0;
           c = 1;
+          play(stepsSounds[Math.floor(Math.random() * stepsSounds.length)], Math.random() * 0.3 + 0.7 * positionVolume(animal.p));
         }
         else {
           animal.v[0] = a;
@@ -606,7 +615,7 @@ function animalUpdate (animal, center) {
         c = 1;
         animal.p[1] ++;
         animal.v = [a, b];
-        jump(animal.p, animal.v);
+        play(jumps[Math.floor(Math.random() * jumps.length)], Math.random() * 0.3 + 0.7 * positionVolume(animal.p));
       }
     }
     if (!c) i -= 3;
@@ -652,12 +661,6 @@ function animalUpdate (animal, center) {
   else {
     animal.p = p;
   }
-
-  /*
-  if (isNaN(animal.p[0]+animal.p[1])) {
-    console.log("Animal got NaN positions!!!", animal);
-  }
-  */
 }
 
 //////////////////////////////////////
@@ -905,7 +908,6 @@ function generate (startX) {
 
   // Dichotomic search starting from the center
   function locateSpot (xMin, xMax, maxIteration) {
-    //console.log(arguments, spots);
     if (!maxIteration || nbSpots <= spots.length) return;
     var xCenter = Math.floor(xMin+(xMax-xMin)/2);
     var airOnTop = 0;
@@ -972,8 +974,6 @@ function rechunk (fromX, toX) {
   if (camStart) camStart[0] -= fromX * zoom;
 }
 
-window.r = rechunk;
-
 function checkRechunk () {
   var alives = [];
   for (var i=0; i<animals.length; ++i) {
@@ -985,9 +985,9 @@ function checkRechunk () {
     maxX = worldStartX + (camera[0] + resolution[0]) / zoom;
   }
   else {
-    minX = animals[0].p[0], maxX = minX;
+    minX = alives[0].p[0], maxX = minX;
     for (var i=0; i<alives.length; ++i) {
-      var animal = animals[i];
+      var animal = alives[i];
       minX = Math.min(animal.p[0], minX);
       maxX = Math.max(animal.p[0], maxX);
     }
@@ -1020,6 +1020,7 @@ for (x=0; x<100; ++x) {
 }
 
 function init () {
+  play(initSound);
   topScore = 0;
   for (i = 0; i < initialAnimals; ++i) {
     var x = Math.floor(40 + 40 * Math.random());
@@ -1030,6 +1031,7 @@ function init () {
 }
 
 function gameOver () {
+  play(gameoverSound);
   localStorage.ibex = Math.max(topScore, localStorage.ibex||0);
   setTimeout(function () {
     onclick = location.reload;
@@ -1111,6 +1113,7 @@ function render () {
         var other = animals[j];
         if (!other.d && distance(self.p, other.p) < 10) {
           self.d = 0;
+          play(wakeUpSound);
           break;
         }
       }
