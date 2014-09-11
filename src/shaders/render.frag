@@ -179,7 +179,13 @@ int getState (vec2 pos) {
 }
 
 vec3 stateColorPass (int e, vec2 pos) {
-  return (e==8 ? mix(1.0, rand(pos), 0.2) : 1.0) * colorFor(e);
+  return (
+    mix(1.0, rand(pos), 0.05*float(e==1) + 0.2*float(e==8)) +
+    float(e==8) * (
+      step(0.97, rand(pos)) * vec3(3.0, 0.0, 0.0) +
+      step(rand(pos), 0.02) * vec3(1.5, -0.5, 0.5)
+    )
+  ) * colorFor(e);
 }
 
 
@@ -398,7 +404,7 @@ void main () {
     scorePos -= (resolution - resolution / vec2(6.0, 36.0)) / 2.;
   }
   if (number6(score, (scorePos/resolution) * 128. * vec2(1,resolution.y/resolution.x)) > 0.0) {
-    c = float(!started)*vec3(1.0, 0.2, 0.0) + 0.2 + 0.5 * (1.0-c);
+    c = float(!started)*vec3(1.0, 0.2, 0.0) + 0.4 + 0.3 * (1.0-c);
   }
 
   if (!gameover && started) {

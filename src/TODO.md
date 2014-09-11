@@ -6,17 +6,10 @@ Game Goal
 
 TODO
 ===
-- Map gen variety:
-  - if so, better move to glsl generating?
-  - forest areas!!!
-  - rarely have water source in caves?
-  - rarely have volcanos?
-- Polish game progressive difficulty: volcano propagation increase? hell zone speed increase?
-- Bugfix: implement proper collision detection.
-- Polish: improve animals decisions: avoid suicidal decisions.
 - Audio !
-- Polish: Make sure animals are safe at spawn
-- when left disappear make it blurred?
+- mouse wheel to change elements
+- Fix hell trigger position
+- Polish game progressive difficulty: volcano propagation increase? hell zone speed increase?
 
 - Polish: More variety in the design & events
   - season / weather? (rain, thunder)
@@ -25,11 +18,20 @@ TODO
   - More variety in generated terrains? (lot of air / lot of earth / a bit more forest)
     - To create more diversity: add a difference between "Forest" and "Mushroom": forest grows with water, mushroom grows by itself. if mushroom+water or mushrrom+forest -> become forest (forest spread in mushroom)
 
+- Polish: Make sure animals are safe at spawn
 - MOBILE support???
+- when left disappear make it blurred?
 
 Done
 ---
 
+DONE - Bugfix: implement proper collision detection.
+DONE - Polish: improve animals decisions: avoid suicidal decisions.
+DONE - Map gen variety:
+DONE  - if so, better move to glsl generating?
+DONE  - forest areas!!!
+DONE  - rarely have water source in caves?
+DONE  - rarely have volcanos?
 DONE - Polish: animal graphics?
 DONE - keep score in local storage
 DONE - polish gameplay: a central cursor & you switch between mode which make the elements UI slide

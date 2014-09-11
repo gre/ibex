@@ -81,14 +81,14 @@ float grassDistrib (vec2 p) {
   return mix(
   rand(vec2(p.x)),
   0.5*(1.0+(cos(sin(p.y*0.01 + p.x * 0.05) + (1.0 + 0.3*sin(p.x*0.01)) * p.y * 0.08))),
-  0.5
+  0.6
   );
 }
 
 bool hellTriggerPosition (vec2 p) {
   if (tickStart==0.0) return false;
-  float hellTickStart = 250.0;
-  float hellTickInterv = 100.0;
+  float hellTickStart = 600.0;
+  float hellTickInterv = 40.0;
   float hellSize = 6.0;
   float dt = tick - tickStart - hellTickStart - hellSize * startX;
   float x = floor(dt / hellTickInterv);
@@ -114,7 +114,7 @@ void main () {
 
   int r = A;
 
-  int grassMaxHeight = int(20.0 * pow(grassDistrib(p), 1.4));
+  int grassMaxHeight = int(20.0 * pow(grassDistrib(p), 1.3));
   float rainRelativeTime = mod(tick, 300.0);
   float volcRelativeTime = mod(tick, 25.0);
 
@@ -129,7 +129,7 @@ void main () {
    
    ||  // Fire propagation: When fire met grass, fire can stay to continue to consume it
 
-   CC == F && RAND < 0.8 && AnyADJ(G)
+   CC == F && RAND < 0.9 && AnyADJ(G)
   ) {
     r = F;
   }
@@ -202,8 +202,8 @@ void main () {
 
     // Earth -> Volcano
     if (
-    RAND < 0.006 && (
-      0.3 * float(NW==F) + 0.2 * float(SS==F) + 0.3 * float(NE==F) +  
+    RAND < 0.006 + 0.02 * smoothstep(0.0, 10000.0, startX + p.x) && (
+      0.3 * float(NW==F) + 0.2 * float(SS==F) + 0.3 * float(NE==F) +
       0.5 * float(WW==F) +                      0.5 * float(EE==F) +
       1.0 * float(SW==F) + 1.2 * float(NN==F) + 1.0 * float(SE==F)
       >= 3.0 - 2.1 * RAND
@@ -212,7 +212,7 @@ void main () {
     ||
 
     // Volcano is going up
-    RAND < 0.01 + 0.01 * smoothstep(500.0, 2000.0, startX / p.x) && ( int(WW==V) + int(SS==V) + int(EE==V) + int(SE==V) + int(SW==V) > 1 )
+    RAND < 0.01 + 0.02 * smoothstep(500.0, 5000.0, startX + p.x) && ( int(WW==V) + int(SS==V) + int(EE==V) + int(SE==V) + int(SW==V) > 1 )
     ) {
       r = V;
     }
@@ -232,7 +232,7 @@ void main () {
       }
     }
     else if (!prevIsSolid && (AnyADJ(E) || AnyADJ(G) || AnyADJ(S))) {
-      if (RAND < 0.02 &&
+      if (RAND < 0.04 &&
         get(0, -grassMaxHeight) != G && (
           SS==G && RAND < 0.07 || // The grass sometimes grow
           SS==E && RAND < 0.02 || // The grass rarely spawn by itself
@@ -355,7 +355,7 @@ void main () {
     vec2 pos = floor(p);
     if (distance(pos, vec2(drawPosition)) <= drawRadius) {
       if (drawObject == W) {
-        if (prevIsSolid) {
+        if (prevIsSolid && CC!=G) {
           r = S;
         }
         else if (!prevIsSolid && mod(pos.x + pos.y, 2.0)==0.0) {

@@ -4,10 +4,14 @@ var sounds = [
  [0,,0.1812,,0.1349,0.4524,,0.2365,,,,,,0.0819,,,,,1,,,,,0.5]
 ].map(jsfxr);
 
-function play (i) {
+function play (src, volume) {
   var player = new Audio();
-  player.src = sounds[i];
+  player.src = src;
+  player.volume = volume;
   player.play();
+}
+
+function jump (p, v) {
 }
 
 ////// Game constants / states /////
@@ -57,6 +61,7 @@ var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
 var worldPixelBuf = new Uint8Array(worldSize[0] * worldSize[1]);
 var worldStartX = 0;
 
+var windowResolution;
 var resolution;
 var zoom;
 var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
@@ -92,7 +97,7 @@ function setCam (c) {
 }
 
 function posE (e) {
-  return [ e.clientX, resolution[1] - e.clientY ];
+  return [ e.clientX, windowResolution[1] - e.clientY ];
 }
 
 function distance (a, b) {
@@ -108,10 +113,10 @@ resetMouse();
 
 function uiSelectElement (p) {
   var height = 2 * 4 * zoom;
-  var originY = resolution[1] / 3 - 14 * zoom - height / 2;
+  var originY = windowResolution[1] / 3 - 14 * zoom - height / 2;
   if (originY < p[1] && p[1] < originY + height) {
     var width = 8 * zoom + 8;
-    var x = (resolution[0] - 4 * width) / 2;
+    var x = (windowResolution[0] - 4 * width) / 2;
     var i = Math.floor((p[0]-x)/width);
     if (0 <= i && i < 4) {
       return i;
@@ -170,15 +175,24 @@ C.addEventListener("mousemove", function (e) {
   }
 });
 
+// Mouse wheel
 
+var wheel = 0;
+onwheel=onmousewheel=function(e) {
+  var w = ~~((wheel += e.deltaY) / 100);
+  drawObject = (16 + drawObject + w) % 4;
+  wheel -= 100 * w;
+};
 
 // Keyboard
 
 var keysDown = new Uint8Array(200); // we do that because nicely initialized to 0
 
 function keyDraw () {
+  var space = keysDown[32];
+  if (space && !started) start();
   if (!started || gameover) return;
-  if (keysDown[32]) {
+  if (space) {
     draw = 1;
   }
   if (keysDown[87]||keysDown[90]) {
@@ -195,13 +209,7 @@ function keyDraw () {
   }
   if (!draw && dragStart && !dragCam) {
     draw = 1;
-    //drawPosition = posToWorld(uiElementCenterPos(drawObject));
   }
-  /*
-  if (draw) {
-    drawPosition = posToWorld(uiElementCenterPos(drawObject));
-  }
-  */
   drawPosition = posToWorld(cursorCenterPos());
 }
 
@@ -251,15 +259,15 @@ var sightw = 32,
     sighthalfw = sightw / 2,
     sighthalfh = sighth / 2;
 
-function Animal (initialPosition, dt) {
+function Animal (initialPosition, t) {
   var self = this;
   // p: position, t: targetted position
   self.p = initialPosition;
-  self.t = [];
+  self.t = t||[];
   // v: velocity
   self.v = [0, 0];
   // dt: next decision time
-  self.dt = dt;
+  self.dt = 0;
 
   // this.d <- the animal status.
   //      *  -1  animal to rescue.
@@ -300,6 +308,7 @@ function animalSyncSight (animal) {
    * e (elements): count of elements in the [floor,ceil] range. (array with same indexes)
    * v (elements viewable)
    * a (accessible): 1 if next pixel can be accessed. 0 otherwise
+   * l: all elements in front whatever the slope is.
    *
    * The array also contains fields:
    * a (accessible count): number of pixels that can be accessed
@@ -322,6 +331,7 @@ function animalSyncSight (animal) {
           c,
           h,
           s,
+          l = animalPixel(animal, x, sighthalfh),
           e = [0,0,0,0,0,0,0,0,0],
           ve = [0,0,0,0,0,0,0,0,0];
       var pixels = new Uint8Array(sighth);
@@ -334,14 +344,14 @@ function animalSyncSight (animal) {
       // Compute height
       h = c - f - 1;
       // Stop if conditions are reachable for the animal
-      if (h < 4 /* min height */ || s < -3 || 3 < s /* max fall / climb */) {
+      if (h < 4 /* min height */ || s < -4 || 4 < s /* max fall / climb */) {
         a = 0;
       }
       // Compute elements
       for (y=f; y<=c; ++y) e[pixels[y]] ++;
       for (y=0; y<sighth; ++y) ve[pixels[y]] ++;
 
-      ret.push({f:f,c:c,h:h,s:s,e:e,v:ve,a:a});
+      ret.push({f:f,c:c,h:h,s:s,e:e,v:ve,a:a,l:l});
       if (a) countA ++;
     }
     ret.a = countA;
@@ -383,13 +393,34 @@ function animalUpdate (animal, center) {
   }
 
   // animal reaches the ground violently
-  if (!groundDiff && animal.v[1] < -2) {
+  if (!groundDiff && animal.v[1] < -3) {
     return animalDie(animal, 0);
   }
 
   if (groundDiff) {
     // ground buries animal
-    if (f > sighthalfh && groundDiff < -4) return animalDie(animal, 1);
+    if (f > sighthalfh && groundDiff < -5) {
+      var airLeft = 0, airRight = 0;
+      for (i=0; i<5; ++i) {
+        if (airLeft==i && ground(animal.sl[i].l)) airLeft ++;
+        if (airRight==i && ground(animal.sr[i].l)) airRight ++;
+      }
+      if (airLeft!=5) {
+        animal.p[0] -= airLeft;
+        if (animal.v[0] > 0) {
+          animal.v[0] *= -0.5;
+        }
+      }
+      else if (airRight!=5) {
+        animal.p[0] += airLeft;
+        if (animal.v[0] < 0) {
+          animal.v[0] *= -0.5;
+        }
+      }
+      else {
+        return animalDie(animal, 1);
+      }
+    }
 
     if (groundDiff > 0) {
       // Gravity
@@ -415,7 +446,7 @@ function animalUpdate (animal, center) {
   //////// Animal decision (each 500ms - 1s) ///////
 
   var now = Date.now();
-  if (!animal.d && (animal.t.length==0 || now > animal.dt)) {
+  if (!animal.d && (animal.t.length==0 || animal.t[0] != 'n' && now > animal.dt)) {
     if (now > animal.dt) {
       animal.t = []; // Forget the previous decision
     }
@@ -475,7 +506,7 @@ function animalUpdate (animal, center) {
       for (i=cliffRightLastPlatform[0]+2; i<sighthalfw; ++i) {
         var r = animal.sr[i];
         var dy = r.f - cliffRightLastPlatform[1];
-        if (Math.abs(dy) <= 5) { // valid jump conditions
+        if (r.f != -1 && -8 <= dy && dy <= 5) { // valid jump conditions
           if (r.h >= 4) { // safety conditions
             cliffRightFollowedBySafePlatform = 1;
             cliffRightAfterPlatform = [ i, r.f ];
@@ -518,19 +549,20 @@ function animalUpdate (animal, center) {
 
     else {
       var r = Math.random();
+      var wnearby = water && waterDistance < 8;
       var d =
+        wnearby && Math.random()<0.7 ? water :
         Math.random() < 0.1 ? animal.sr.a - animal.sl.a :
-        water && waterDistance < 5 && Math.random()<0.5 ? water :
-        Math.random()<0.2 && Math.abs(deltaCenter[0])>80 ? deltaCenter[0] :
+        Math.random()<0.1 && Math.abs(deltaCenter[0])>80 ? deltaCenter[0] :
         1
         ;
-      if (r < 0.8 || water && waterDistance < 5) {
+      if (r < 0.9 || wnearby) {
         decision = [
-          "w", (d>=0 ? 1 : -1) * 0.3, x + (d>=0 ? animal.sr.a-1 : -animal.sl.a+1)
+          "w", (d>=0 ? 1 : -1) * (0.4 - (wnearby ? 0.3 * step(8, 0, waterDistance) : 0.0)), x + (d>=0 ? animal.sr.a-1 : -animal.sl.a+1)
         ];
       }
       else {
-        decision = ["n", 500, 0];
+        decision = ["n", 800, 0];
       }
     }
 
@@ -584,8 +616,8 @@ function animalUpdate (animal, center) {
     if (wind > 3) add[0] += 0.1;
     if (wind < 3) add[0] -= 0.1;
     if (groundDiff==0) {
-      friction *= 1 - 0.2 * step(0, 3, els[8]);
-      friction *= 1 - 0.5 * step(0, 3, els[3]);
+      friction *= 1 + 0.8 * step(0, 3, els[8]);
+      friction *= 1 - 0.2 * step(0, 3, els[3]);
     }
     v[0] += add[0];
     v[1] += add[1];
@@ -693,7 +725,13 @@ gl.uniform1i(renderStateL, 0);
 gl.uniform3fv(renderColorsL, colors);
 
 function onResize () {
-  resolution = [ window.innerWidth, window.innerHeight ];
+  var real = [ window.innerWidth, window.innerHeight ];
+  windowResolution = real;
+  var h = Math.min(real[0], 768);
+  var w = Math.floor(h * real[0] / real[1]);
+  resolution = [ w, h ];
+  C.style.width = real[0]+"px";
+  C.style.height = real[1]+"px";
   C.width = resolution[0];
   C.height = resolution[1];
   zoom = Math.round(2 + Math.sqrt(C.width * C.height) / 250);
@@ -776,6 +814,8 @@ function affectColor (buf, i, c) {
 function generate (startX) {
   var randTerrainAmount = !worldStartX ? 0 : 0.08 * Math.random() * Math.random();
   var randTerrainDown = !worldStartX ? 0 : 100 * Math.random() * Math.random();
+  var waterInGeneration = Math.random() < 0.3 ? 24 * Math.random() * Math.random() : 0;
+  var volcanoInGeneration = Math.random() < - 0.1 * waterInGeneration + 0.4 ? 16 * Math.random() * Math.random() : 0;
 
   // This could be implemented in a 3rd shader for performance.
 
@@ -794,6 +834,10 @@ function generate (startX) {
     }
   }
 
+  // The map generation code has become messy and
+  // super crazy do not try to understand it XD
+  // That is a weird cellular automaton
+
   var K = 26;
 
   var x, y, i, k, e;
@@ -804,7 +848,7 @@ function generate (startX) {
         e = ground(get(worldPixelBuf, startX-1, y)) ? 1 : 0;
       }
       else {
-        e = +(Math.random() > -0.2 * step(100, 0, x + worldStartX) + 0.09 + randTerrainAmount + 0.3 * (step(0, 25, y) + step(worldSize[1]-50-randTerrainDown, worldSize[1] - 2 - 0.2 * randTerrainDown, y)));
+        e = +(Math.random() > -0.25 * step(140, 0, x + worldStartX) * step(worldSize[1]-5, worldSize[1]-50, y) + 0.09 + randTerrainAmount + 0.3 * (step(0, 25, y) + step(worldSize[1]-50-randTerrainDown, worldSize[1] - 2 - 0.2 * randTerrainDown, y)));
       }
       set(worldPixelBuf, x, y, e);
     }
@@ -820,16 +864,18 @@ function generate (startX) {
         var me = get(cur, x, y);
         var sum =
           0.1 * me +
-          (0.9 + 0.1 * Math.random()) * get(cur, x-1, y-1) +
-          (0.9 + 0.1 * Math.random()) * get(cur, x, y-1) +
-          (0.9 + 0.1 * Math.random()) * get(cur, x+1, y-1) +
-          (1.4 + 0.2 * Math.random()) * get(cur, x-1, y) +
-          (1.1 + 0.2 * Math.random()) * get(cur, x+1, y) +
-          (1.6 - 0.1 * Math.random()) * get(cur, x-1, y+1) +
-          (1.2 - 0.2 * Math.random()) * get(cur, x, y+1) +
-          (1.0 - 0.1 * Math.random()) * get(cur, x+1, y+1);
+          (0.9 + 0.1 * Math.random()) * (!!get(cur, x-1, y-1)) +
+          (0.9 + 0.1 * Math.random()) * (!!get(cur, x, y-1)) +
+          (0.9 + 0.1 * Math.random()) * (!!get(cur, x+1, y-1)) +
+          (1.4 + 0.2 * Math.random()) * (!!get(cur, x-1, y)) +
+          (1.1 + 0.2 * Math.random()) * (!!get(cur, x+1, y)) +
+          (1.6 - 0.1 * Math.random()) * (!!get(cur, x-1, y+1)) +
+          (1.2 - 0.2 * Math.random()) * (!!get(cur, x, y+1)) +
+          (1.0 - 0.1 * Math.random()) * (!!get(cur, x+1, y+1));
 
         var e = +(sum <= 6 + (Math.random()-0.5) * (1-k/K));
+        if (e && sum >= 6 - Math.random() * waterInGeneration + 4 * step(110, 0, y)) e = 5;
+        if (e && sum >= 6 - Math.random() * volcanoInGeneration + 6 * step(20, 60, y)) e = 4;
         set(swp, x, y, e);
       }
     }
@@ -844,7 +890,7 @@ function generate (startX) {
   // Locate good spots to spawn some animals to rescue
 
   var nbSpots = Math.min(
-    Math.random() * 3 + 1 - 4 * Math.random() * Math.random(),
+    -1 - Math.random() * 2 + 6 * Math.random() * Math.random(),
     MAX_ANIMALS-animals.length);
   var spots = [];
 
@@ -879,7 +925,7 @@ function generate (startX) {
   if (startX) {
     locateSpot(startX+1, worldSize[0]-1, 8);
     for (var i=0; i<spots.length; ++i) {
-      var animal = new Animal(spots[i], 0);
+      var animal = new Animal(spots[i]);
       animal.d = -1;
       animals.push(animal);
     }
@@ -917,6 +963,8 @@ function rechunk (fromX, toX) {
   if (camStart) camStart[0] -= fromX * zoom;
 }
 
+window.r = rechunk;
+
 function checkRechunk () {
   var alives = [];
   for (var i=0; i<animals.length; ++i) {
@@ -928,7 +976,7 @@ function checkRechunk () {
     maxX = worldStartX + (camera[0] + resolution[0]) / zoom;
   }
   else {
-    var minX = animals[0].p[0], maxX = minX;
+    minX = animals[0].p[0], maxX = minX;
     for (var i=0; i<alives.length; ++i) {
       var animal = animals[i];
       minX = Math.min(animal.p[0], minX);
@@ -967,7 +1015,7 @@ function init () {
   for (i = 0; i < initialAnimals; ++i) {
     var x = Math.floor(40 + 40 * Math.random());
     var y = tops[x]+1;
-    var a = new Animal([ x, y ], Date.now() + 5000 + 8000 * Math.random());
+    var a = new Animal([ x, y ], ["n", 3000 + 3000 * Math.random(), 0]);
     animals.push(a);
   }
 }
@@ -996,7 +1044,7 @@ function start () {
 
 var startTime = Date.now();
 var lastUpdate = 0;
-var lastRefreshWorld = startTime + 5000;
+var lastRefreshWorld = 0;
 function update () {
   var now = Date.now();
   var needRead = now - lastRefreshWorld >= refreshWorldRate;
