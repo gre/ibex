@@ -12,6 +12,14 @@ function play (src, volume) {
 }
 
 function jump (p, v) {
+  var vol = step(200, 100, distance(p, posToWorld(cursorCenterPos())));
+  var d = 0;
+  d += v[0] * v[0];
+  d += v[1] * v[1];
+  d /= 2;
+  var src = jsfxr([0,0.03,0.3,0.13,0.3+0.3*d,0.26,,0.1399,,0.02,0.07,-0.06,,0.42,,,-0.06,-0.02,0.34,0.04,,0.28,0.06,0.35]);
+  console.log("jump", d, vol);
+  return play(src, d, vol);
 }
 
 ////// Game constants / states /////
@@ -598,6 +606,7 @@ function animalUpdate (animal, center) {
         c = 1;
         animal.p[1] ++;
         animal.v = [a, b];
+        jump(animal.p, animal.v);
       }
     }
     if (!c) i -= 3;
