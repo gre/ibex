@@ -59,9 +59,9 @@ uniform sampler2D state;
 uniform bool running;
 
 uniform bool draw;
-uniform ivec2 drawPosition;
-uniform float drawRadius;
-uniform int drawObject;
+uniform ivec2 DP;
+uniform float DR;
+uniform int DO;
 
 int get (int x_, int y_) {
   vec2 uv = (gl_FragCoord.xy + vec2(x_, y_)) / size;
@@ -353,8 +353,8 @@ void main () {
 
   if (draw) {
     vec2 pos = floor(p);
-    if (distance(pos, vec2(drawPosition)) <= drawRadius) {
-      if (drawObject == W) {
+    if (distance(pos, vec2(DP)) <= DR) {
+      if (DO == W) {
         if (prevIsSolid && CC!=G) {
           r = S;
         }
@@ -362,11 +362,11 @@ void main () {
           r = W;
         }
       }
-      else if (drawObject == F) {
+      else if (DO == F) {
         r = prevIsSolid ? V : F;
       }
       else {
-        r = drawObject;
+        r = DO;
       }
     }
   }

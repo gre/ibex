@@ -11,14 +11,13 @@ var stepsSounds = [];
 var screams = [];
 for (i = 0; i < 4; ++i) {
   screams.push(jsfxr([1,0.61,0.36,0.14,0.75,0.68,,-0.16,-0.02,0.73,0.12,-0.0999,0.32,Math.random()/2,0.32,0.22,0.1999,-0.02,0.4,-0.06,0.18,0.78,,0.5]));
-  jumps.push(jsfxr([0,0.03,0.3,0.13,0.2,0.26+i/20,,0.1399,,0.02,0.07,-0.06,,0.42,,,-0.06,-0.02,0.34,0.04,,0.28,0.06,0.2]));
+  jumps.push(jsfxr([0,0.03,0.3,0.13,0.2,0.26+i/20,,0.1399,,0.02,0.07,-0.06,,0.42,,,-0.06,-0.02,0.34,0.04,,0.28,0.06,0.3]));
   stepsSounds.push(jsfxr([3,0.16,0.1749,,0.22,0.05+i/9,,-0.16,,,,,,,,,,,0.08,-0.06,,0.8,,0.3]));
 }
 
-var wakeUpSound = jsfxr([1,0.16,0.18,,0.45,0.23,,,0.1,0.37,0.2,0.58,0.44,,,,,,0.3,,0.21,0.15,0.34,0.3]);
+var wakeUpSound = jsfxr([1,0.16,0.18,,0.45,0.23,,,0.1,0.37,0.2,0.58,0.44,,,,,,0.3,,0.21,0.15,0.34,0.5]);
 
-var gameoverSound = jsfxr([0,0.11,1,0.22,0.7,0.61,,-0.06,-0.0799,0.21,0.28,-0.04,0.2,0.56,-0.4,,0.28,-0.54,0.1,-0.04,0.52,0.8,-0.02,0.5]);
-var initSound = jsfxr([0,0.11,1,0.22,0.7,0.19,,0.12,0.02,0.29,0.41,-0.26,0.56,0.56,-0.4,,0.28,-0.54,0.24,-0.04,,0.8,-0.02,0.5]);
+var gameoverSound = jsfxr([0,0.11,1,0.22,0.7,0.61,,-0.06,-0.0799,0.21,0.28,-0.04,0.2,0.56,-0.4,,0.28,-0.54,0.1,-0.04,0.52,0.8,-0.02,0.8]);
 
 ///////////// UTILITIES ////////////////////
 
@@ -52,25 +51,17 @@ function parseColors (bufin, bufout) {
 
 ////// Game constants / states /////
 
-var MAX_ANIMALS = 30;
-var brushSize = 6;
-
-var seed = Math.random();
 var C = document.createElement("canvas");
 
 var started = 0;
 var gameover = 0;
-var topScore = +(localStorage.ibex || 0);
 var saved = 0;
+var topScore = +(localStorage.ibex || 0);
 var score = topScore;
 var tiles = new Image();
 tiles.src = "t.png";
 
 // in milliseconds
-var updateRate = 35;
-var refreshWorldRate = 300;
-
-var initialAnimals = 8;
 
 var colors = [
   0.11, 0.16, 0.23, // 0: air
@@ -91,7 +82,7 @@ var tick = 0;
 var startTick = 0;
 var worldRefreshTick = 0;
 var worldWindow = 128; // The size of the world chunk window in X
-var worldSize = [ 2 * worldWindow, 256 ];
+var worldSize = [ 256, 256 ];
 var rescueSpawnMinY = 10;
 var rescueSpawnMaxY = 150;
 var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
@@ -105,10 +96,13 @@ var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
 var cameraV = [0, 0 ];
 var mouse = [ 0, 0 ];
 
+var dragStart;
+var dragCam;
+var selectElStart;
 var draw = 0;
 var drawPosition;
 var drawObject = 0;
-var drawRadius = brushSize;
+var drawRadius = 6;
 
 var animals = [];
 var alive;
@@ -159,7 +153,7 @@ function uiSelectElement (p) {
 }
 
 function isCursor (p) {
-  return distance(cursorCenterPos(), p) < zoom * (brushSize + 2);
+  return distance(cursorCenterPos(), p) < zoom * 8;
 }
 function cursorCenterPos () {
   return [ resolution[0] / 2, resolution[1] / 2 ];
@@ -695,29 +689,29 @@ shaderSrc = VERTEX_RENDER; shaderType = gl.VERTEX_SHADER;
 shader = gl.createShader(shaderType);
 gl.shaderSource(shader, shaderSrc);
 gl.compileShader(shader);
-validate(shader, shaderSrc);
+//validate(shader, shaderSrc);
 gl.attachShader(program, shader);
 
 shaderSrc = FRAGMENT_RENDER; shaderType = gl.FRAGMENT_SHADER;
 shader = gl.createShader(shaderType);
 gl.shaderSource(shader, shaderSrc);
 gl.compileShader(shader);
-validate(shader, shaderSrc);
+//validate(shader, shaderSrc);
 gl.attachShader(program, shader);
 
 gl.linkProgram(program);
-validateProg(program);
+//validateProg(program);
 gl.useProgram(program);
 
 var buffer = gl.createBuffer();
-var renderPositionL = gl.getAttribLocation(program, "position");
+var renderPositionL = gl.getAttribLocation(program, "P");
 gl.enableVertexAttribArray(renderPositionL);
 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
 
 
 onresize = function () {
-  var real = [ window.innerWidth, window.innerHeight ];
+  var real = [ innerWidth, innerHeight ];
   windowResolution = real;
   var h = Math.min(real[0], 512);
   var w = ~~(h * real[0] / real[1]);
@@ -743,22 +737,22 @@ var renderTimeL = gl.getUniformLocation(program, "time");
 var renderAliveL = gl.getUniformLocation(program, "alive");
 var renderToRescueL = gl.getUniformLocation(program, "toRescue");
 var renderZoomL = gl.getUniformLocation(program, "zoom");
-var renderStartedL = gl.getUniformLocation(program, "started");
-var renderGameOverL = gl.getUniformLocation(program, "gameover");
+var renderStartedL = gl.getUniformLocation(program, "ST");
+var renderGameOverL = gl.getUniformLocation(program, "GO");
 var renderScoreL = gl.getUniformLocation(program, "score");
 var renderStateL = gl.getUniformLocation(program, "state");
-var renderWorldSizeL = gl.getUniformLocation(program, "worldSize");
-var renderAnimalsL = gl.getUniformLocation(program, "animals");
-var renderAnimalsLengthL = gl.getUniformLocation(program, "animalsLength");
+var renderWorldSizeL = gl.getUniformLocation(program, "WS");
+var renderAnimalsL = gl.getUniformLocation(program, "AN");
+var renderAnimalsLengthL = gl.getUniformLocation(program, "AL");
 var renderAnimalsTilesL = gl.getUniformLocation(program, "tiles");
-var renderColorsL = gl.getUniformLocation(program, "colors");
-var renderDrawObjectL = gl.getUniformLocation(program, "drawObject");
-var renderDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
+var renderColorsL = gl.getUniformLocation(program, "CL");
+var renderDrawObjectL = gl.getUniformLocation(program, "DO");
+//var renderDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
 
 var cameraL = gl.getUniformLocation(program, "camera");
-var mouseL = gl.getUniformLocation(program, "mouse");
+//var mouseL = gl.getUniformLocation(program, "mouse");
 var drawingL = gl.getUniformLocation(program, "drawing");
-var resolutionL = gl.getUniformLocation(program, "resolution");
+var resolutionL = gl.getUniformLocation(program, "RES");
 
 var texture = gl.createTexture();
 tiles.onload = function () {
@@ -786,18 +780,18 @@ shaderSrc = VERTEX_LOGIC; shaderType = gl.VERTEX_SHADER;
 shader = gl.createShader(shaderType);
 gl.shaderSource(shader, shaderSrc);
 gl.compileShader(shader);
-validate(shader, shaderSrc);
+//validate(shader, shaderSrc);
 gl.attachShader(program, shader);
 
 shaderSrc = FRAGMENT_LOGIC; shaderType = gl.FRAGMENT_SHADER;
 shader = gl.createShader(shaderType);
 gl.shaderSource(shader, shaderSrc);
 gl.compileShader(shader);
-validate(shader, shaderSrc);
+//validate(shader, shaderSrc);
 gl.attachShader(program, shader);
 
 gl.linkProgram(program);
-validateProg(program);
+//validateProg(program);
 
 var logicSeedL = gl.getUniformLocation(program, "seed");
 var logicRunningL = gl.getUniformLocation(program, "running");
@@ -807,10 +801,10 @@ var logicStartTickL = gl.getUniformLocation(program, "tickStart");
 var logicStateL = gl.getUniformLocation(program, "state");
 var logicSizeL = gl.getUniformLocation(program, "size");
 var logicDrawL = gl.getUniformLocation(program, "draw");
-var logicDrawPositionL = gl.getUniformLocation(program, "drawPosition");
-var logicDrawObjectL = gl.getUniformLocation(program, "drawObject");
-var logicDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
-var logicPositionL = gl.getAttribLocation(program, "position");
+var logicDrawPositionL = gl.getUniformLocation(program, "DP");
+var logicDrawObjectL = gl.getUniformLocation(program, "DO");
+var logicDrawRadiusL = gl.getUniformLocation(program, "DR");
+var logicPositionL = gl.getAttribLocation(program, "P");
 
 gl.enableVertexAttribArray(logicPositionL);
 
@@ -826,7 +820,7 @@ gl.bindFramebuffer(gl.FRAMEBUFFER, logicFramebuffer);
 gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, logicTexture, 0);
 
 gl.useProgram(program);
-gl.uniform1f(logicSeedL, seed);
+gl.uniform1f(logicSeedL, Math.random());
 gl.uniform1i(logicStateL, 0);
 
 var logicProgram = program;
@@ -925,7 +919,7 @@ function generate (startX) {
 
   var nbSpots = startX ? Math.min(
     -1 - Math.random() * 2 + 6 * Math.random() * Math.random(),
-    MAX_ANIMALS-animals.length) : 5;
+    30-animals.length) : 5;
   var spots = [];
 
   // Dichotomic search starting from the center
@@ -955,7 +949,7 @@ function generate (startX) {
     }
   }
 
-  locateSpot(startX+1, worldSize[0]-1, 4);
+  locateSpot(startX+1, worldSize[0]-1, 6);
   for (var i=0; i<spots.length; ++i) {
     var animal = new Animal(spots[i]);
     animal.d = -1;
@@ -1009,7 +1003,7 @@ function checkRechunk () {
     }
   }
   var windowInf = Math.max(worldStartX, worldWindow * ~~(minX / worldWindow - 2));
-  var windowSup = Math.max(worldStartX + worldSize[0], worldWindow * Math.ceil(maxX / worldWindow + 2));
+  var windowSup = Math.max(worldStartX + worldSize[0], worldWindow * ~~(maxX / worldWindow + 2));
 
   var fromX = Math.max(0, windowInf - worldStartX); // No going back
   var toX = Math.max(worldSize[0], fromX + (windowSup - windowInf)); // No going back
@@ -1036,9 +1030,8 @@ for (x=0; x<100; ++x) {
 }
 
 function init () {
-  play(initSound);
   topScore = 0;
-  for (i = 0; i < initialAnimals; ++i) {
+  for (i = 0; i < 8; ++i) {
     var x = ~~(40 + 40 * Math.random());
     var y = tops[x]+1;
     var a = new Animal([ x, y ], ["n", 3000 + 3000 * Math.random(), 0]);
@@ -1050,7 +1043,7 @@ function gameOver () {
   play(gameoverSound);
   localStorage.ibex = Math.max(topScore, localStorage.ibex||0);
   setTimeout(function () {
-    onclick = location.reload;
+    onclick = location.reload.bind(location);
   }, 2000);
 }
 
@@ -1074,8 +1067,8 @@ var lastUpdate = 0;
 var lastRefreshWorld = 0;
 function update () {
   var now = Date.now();
-  var needRead = now - lastRefreshWorld >= refreshWorldRate;
-  if (!needRead && now-lastUpdate < updateRate) return;
+  var needRead = now - lastRefreshWorld >= 300;
+  if (!needRead && now-lastUpdate < 35) return;
   lastUpdate = now;
   gl.useProgram(logicProgram);
   gl.uniform2fv(logicSizeL, worldSize);
@@ -1203,7 +1196,7 @@ function render () {
   gl.uniform1f(renderToRescueL, gameover ? saved : toRescue);
   gl.uniform1f(renderZoomL, zoom);
   gl.uniform2fv(cameraL, camera);
-  gl.uniform2fv(mouseL, mouse);
+  //gl.uniform2fv(mouseL, mouse);
   gl.uniform1i(drawingL, drawing);
   gl.uniform1i(renderStartedL, started);
   gl.uniform1i(renderGameOverL, gameover);
@@ -1212,7 +1205,7 @@ function render () {
     gl.uniform1fv(renderAnimalsL, animalsData);
   }
   gl.uniform1i(renderAnimalsLengthL, animals.length);
-  gl.uniform1f(renderDrawRadiusL, drawRadius);
+  //gl.uniform1f(renderDrawRadiusL, drawRadius);
   gl.uniform1i(renderDrawObjectL, drawObject);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
@@ -1225,6 +1218,7 @@ document.body.appendChild(C);
 render();
 
 
+/*
 // TODO: Remove in the final release
 
 function validate (shader, shaderSource) {
@@ -1252,3 +1246,4 @@ function validateProg (program) {
    }
 }
 
+*/
