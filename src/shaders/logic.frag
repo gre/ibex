@@ -50,13 +50,13 @@ int Al = 6;
 int Ar = 7;
 int G  = 8;
 
-uniform vec2 size;
-uniform float seed;
-uniform float tick;
-uniform float tickStart;
-uniform float startX;
+uniform vec2 SZ;
+uniform float SD;
+uniform float TI;
+uniform float TS;
+uniform float ST;
 uniform sampler2D state;
-uniform bool running;
+uniform bool RU;
 
 uniform bool draw;
 uniform ivec2 DP;
@@ -64,7 +64,7 @@ uniform float DR;
 uniform int DO;
 
 int get (int x_, int y_) {
-  vec2 uv = (gl_FragCoord.xy + vec2(x_, y_)) / size;
+  vec2 uv = (gl_FragCoord.xy + vec2(x_, y_)) / SZ;
   return (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0) ? 0 : 
     int(floor(.5 + 9. * texture2D(state, uv).r));
 }
@@ -86,11 +86,11 @@ float grassDistrib (vec2 p) {
 }
 
 bool hellTriggerPosition (vec2 p) {
-  if (tickStart==0.0) return false;
-  float hellTickStart = 700.0;
-  float hellTickInterv = 60.0;
-  float hellSize = 6.0;
-  float dt = tick - tickStart - hellTickStart - hellSize * startX;
+  if (TS==0.0) return false;
+  float hellTickStart = 800.0;
+  float hellTickInterv = 70.0;
+  float hellSize = 5.0;
+  float dt = TI - TS - hellTickStart - hellSize * ST;
   float x = floor(dt / hellTickInterv);
   float y = (dt - x * hellTickInterv);
   return distance(hellSize * vec2(2.0 * x, y), p) <= hellSize;
@@ -98,7 +98,7 @@ bool hellTriggerPosition (vec2 p) {
 
 void main () {
   vec2 p = gl_FragCoord.xy;
-  vec2 S_ = p + 0.001 * tick;
+  vec2 S_ = p + 0.001 * TI;
   
   int NW = get(-1, 1);
   int NN = get( 0, 1);
@@ -115,8 +115,8 @@ void main () {
   int r = A;
 
   int grassMaxHeight = int(20.0 * pow(grassDistrib(p), 1.3));
-  float rainRelativeTime = mod(tick, 300.0);
-  float volcRelativeTime = mod(tick, 25.0);
+  float rainRelativeTime = mod(TI, 300.0);
+  float volcRelativeTime = mod(TI, 25.0);
 
   //////// FIRE RULES ///////
 
@@ -156,14 +156,14 @@ void main () {
 
     || // Occasional rain
     !prevIsSolid &&
-    p.y >= size[1]-1.0 &&
+    p.y >= SZ.y-1.0 &&
     rainRelativeTime < 100.0 &&
     between(
       p.x - 
-      (rand(vec2(seed*0.7 + tick - rainRelativeTime)) * size[0]) // Rain Start
+      (rand(vec2(SD*0.7 + TI - rainRelativeTime)) * SZ.x) // Rain Start
       ,
       0.0, 
-      100.0 * rand(vec2(seed + tick - rainRelativeTime)) // Rain Length
+      100.0 * rand(vec2(SD + TI - rainRelativeTime)) // Rain Length
     )
     
     || // Source creates water
@@ -202,7 +202,7 @@ void main () {
 
     // Earth -> Volcano
     if (
-    RAND < 0.006 + 0.02 * smoothstep(0.0, 10000.0, startX + p.x) && (
+    RAND < 0.006 + 0.02 * smoothstep(0.0, 10000.0, ST + p.x) && (
       0.3 * float(NW==F) + 0.2 * float(SS==F) + 0.3 * float(NE==F) +
       0.5 * float(WW==F) +                      0.5 * float(EE==F) +
       1.0 * float(SW==F) + 1.2 * float(NN==F) + 1.0 * float(SE==F)
@@ -212,7 +212,7 @@ void main () {
     ||
 
     // Volcano is going up
-    RAND < 0.01 + 0.02 * smoothstep(500.0, 5000.0, startX + p.x) && ( int(WW==V) + int(SS==V) + int(EE==V) + int(SE==V) + int(SW==V) > 1 )
+    RAND < 0.01 + 0.02 * smoothstep(500.0, 5000.0, ST + p.x) && ( int(WW==V) + int(SS==V) + int(EE==V) + int(SE==V) + int(SW==V) > 1 )
     ) {
       r = V;
     }
@@ -287,10 +287,10 @@ void main () {
     RAND < 0.3 &&
     between(
       p.x -
-      rand(vec2(seed*0.01 + tick - volcRelativeTime)) * size[0] // Volc start
+      rand(vec2(SD*0.01 + TI - volcRelativeTime)) * SZ.x // Volc start
       ,
       0.0,
-      10.0 * rand(vec2(seed*0.07 + tick - volcRelativeTime)) // Volc length
+      10.0 * rand(vec2(SD*0.07 + TI - volcRelativeTime)) // Volc length
     )
   ) {
     r = V;
@@ -377,8 +377,8 @@ void main () {
     r = prevIsSolid ? V : F;
   }
 
-  ///// keep only simple elements when not running /////
-  if (!running) {
+  ///// keep only simple elements when not RU /////
+  if (!RU) {
     if (r == F || r == W|| r == G) r = A;
     if (r == V || r == S) r = E;
   }

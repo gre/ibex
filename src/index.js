@@ -93,7 +93,7 @@ var worldStartX = 0;
 var windowResolution;
 var resolution;
 var zoom = 4;
-var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
+var camera; // Camera is in resolution coordinate (not worldSize)
 var cameraV = [0, 0 ];
 var mouse = [ 0, 0 ];
 var animalSpots = [];
@@ -717,7 +717,7 @@ onresize = function () {
   windowResolution = real;
   var h = Math.min(real[0], 512);
   var w = ~~(h * real[0] / real[1]);
-  if (!started) camera = [ 0, 256 * zoom - h / 2 ];
+  if (!started) camera = [ 0, 256 * zoom - h ];
   resolution = [ w, h ];
   C.style.width = real[0]+"px";
   C.style.height = real[1]+"px";
@@ -738,8 +738,8 @@ onresize();
 
 var renderTimeL = gl.getUniformLocation(program, "time");
 var renderAliveL = gl.getUniformLocation(program, "alive");
-var renderToRescueL = gl.getUniformLocation(program, "toRescue");
-var renderZoomL = gl.getUniformLocation(program, "zoom");
+var renderToRescueL = gl.getUniformLocation(program, "TR");
+var renderZoomL = gl.getUniformLocation(program, "ZM");
 var renderStartedL = gl.getUniformLocation(program, "ST");
 var renderGameOverL = gl.getUniformLocation(program, "GO");
 var renderScoreL = gl.getUniformLocation(program, "score");
@@ -752,9 +752,9 @@ var renderColorsL = gl.getUniformLocation(program, "CL");
 var renderDrawObjectL = gl.getUniformLocation(program, "DO");
 //var renderDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
 
-var cameraL = gl.getUniformLocation(program, "camera");
+var cameraL = gl.getUniformLocation(program, "CM");
 //var mouseL = gl.getUniformLocation(program, "mouse");
-var drawingL = gl.getUniformLocation(program, "drawing");
+var drawingL = gl.getUniformLocation(program, "DR");
 var resolutionL = gl.getUniformLocation(program, "RES");
 
 var texture = gl.createTexture();
@@ -796,13 +796,13 @@ gl.attachShader(program, shader);
 gl.linkProgram(program);
 //validateProg(program);
 
-var logicSeedL = gl.getUniformLocation(program, "seed");
-var logicRunningL = gl.getUniformLocation(program, "running");
-var logicTickL = gl.getUniformLocation(program, "tick");
+var logicSeedL = gl.getUniformLocation(program, "SD");
+var logicRunningL = gl.getUniformLocation(program, "RU");
+var logicTickL = gl.getUniformLocation(program, "TI");
 var logicWorldStartL = gl.getUniformLocation(program, "startX");
-var logicStartTickL = gl.getUniformLocation(program, "tickStart");
+var logicStartTickL = gl.getUniformLocation(program, "TS");
 var logicStateL = gl.getUniformLocation(program, "state");
-var logicSizeL = gl.getUniformLocation(program, "size");
+var logicSizeL = gl.getUniformLocation(program, "SZ");
 var logicDrawL = gl.getUniformLocation(program, "draw");
 var logicDrawPositionL = gl.getUniformLocation(program, "DP");
 var logicDrawObjectL = gl.getUniformLocation(program, "DO");
@@ -927,7 +927,7 @@ function generate (startX) {
 
   // Dichotomic search starting from the center
   function locateSpot (xMin, xMax, maxIteration) {
-    if (!maxIteration || nbSpots <= spots.length) return;
+    if (!maxIteration-- || nbSpots <= spots.length) return;
     var xCenter = ~~(xMin+(xMax-xMin)/2);
     var airOnTop = 0;
     for (
@@ -943,12 +943,12 @@ function generate (startX) {
       airOnTop = isEarth ? 0 : airOnTop + 1;
     }
     if (Math.random() < 0.5) {
-      locateSpot(xMin, xCenter, maxIteration-1);
-      locateSpot(xCenter, xMax, maxIteration-1);
+      locateSpot(xMin, xCenter, maxIteration);
+      locateSpot(xCenter, xMax, maxIteration);
     }
     else {
-      locateSpot(xCenter, xMax, maxIteration-1);
-      locateSpot(xMin, xCenter, maxIteration-1);
+      locateSpot(xCenter, xMax, maxIteration);
+      locateSpot(xMin, xCenter, maxIteration);
     }
   }
 
@@ -1042,15 +1042,8 @@ for (x=0; x<100; ++x) {
 
 function init () {
   topScore = 0;
-  /*
-  for (i = 0; i < 8; ++i) {
-    var x = ~~(40 + 40 * Math.random());
-    var y = tops[x]+1;
-    var a = new Animal([ x, y ], ["n", 3000 + 3000 * Math.random(), 0]);
-    }*/
   for (var i=0; i<animalSpots.length; ++i) {
     var a = new Animal(animalSpots[i], ["n", 3000 + 3000 * Math.random(), 0]);
-    console.log(a);
     animals.push(a);
   }
 }

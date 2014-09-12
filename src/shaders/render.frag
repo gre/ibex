@@ -5,9 +5,9 @@ uniform vec3 CL[9];
 uniform vec2 WS;
 uniform vec2 RES;
 
-uniform float zoom;
-uniform vec2 camera;
-uniform bool drawing;
+uniform float ZM;
+uniform vec2 CM;
+uniform bool DR;
 uniform bool ST;
 uniform bool GO;
 uniform float score;
@@ -17,7 +17,7 @@ uniform sampler2D state;
 uniform float AN[7 * 30]; // array of [x, y, vx, vy, deathReason, deathTime, slope]
 uniform int AL;
 uniform float alive;
-uniform float toRescue;
+uniform float TR;
 uniform sampler2D tiles;
 
 uniform int DO;
@@ -215,12 +215,12 @@ bool logo (vec2 p, vec2 pos, float size) {
 vec2 cursorCenter = RES / vec2(2.0, 2.0);
 
 vec4 cursorUI (vec2 p, vec3 clr) {
-  float radius = 6. * zoom;
+  float radius = 6. * ZM;
   float dist = distance(p, cursorCenter);
   vec3 c = colorFor(DO);
   vec3 c2 = 1.2 * (0.1 + c);
   if (dist < radius - 4.0) {
-    return vec4(1.2 * mix(clr * c2, c, 0.6 - 0.3 * float(drawing)), 1.0);
+    return vec4(1.2 * mix(clr * c2, c, 0.6 - 0.3 * float(DR)), 1.0);
   }
   else if (dist < radius) {
     return vec4(c2 - 0.6 * clr, 1.0);
@@ -229,10 +229,10 @@ vec4 cursorUI (vec2 p, vec3 clr) {
 }
 
 vec4 elements (vec2 p, vec3 clr) {
-  float radius = 4. * zoom;
+  float radius = 4. * ZM;
   float margin = 8.;
   float s = 2.*radius+margin;
-  vec2 center = cursorCenter - vec2(0.0, 14.0 * zoom);
+  vec2 center = cursorCenter - vec2(0.0, 14.0 * ZM);
   vec2 size = vec2(8.*radius + 3.*margin, 2.*radius);
   p = p - center + size / 2.0;
   if (p.x < 0.0 || p.x > size.x || p.y < 0.0 || p.y > size.y) return vec4(0.0);
@@ -277,10 +277,10 @@ vec4 radar (vec2 p, vec2 from, vec2 to) {
   int e = getState(statePos);
   vec3 pixel = colorFor(e);
 
-  vec2 realSize = WS * zoom;
-  vec4 cameraBoundsRes = bounds(radarSize * camera / realSize, radarSize * (camera+RES) / realSize);
-  vec2 cameraA = from + cameraBoundsRes.xy;
-  vec2 cameraB = from + cameraBoundsRes.zw;
+  vec2 realSize = WS * ZM;
+  vec4 CMBoundsRes = bounds(radarSize * CM / realSize, radarSize * (CM+RES) / realSize);
+  vec2 CMA = from + CMBoundsRes.xy;
+  vec2 CMB = from + CMBoundsRes.zw;
 
   float animalInGroup = 0.0;
   float animalToBeRescue = 0.0;
@@ -304,7 +304,7 @@ vec4 radar (vec2 p, vec2 from, vec2 to) {
     + float(animalDead > 0.0) * vec4(1.0, 0.2, 0.1, 1.0)
     + float(animalInGroup > 0.0) * vec4(1.0, 1.0, 0.3, 1.0)
     + rect(p, 2.0, from, to)
-    + rect(p, 1.0, cameraA, cameraB);
+    + rect(p, 1.0, CMA, CMB);
 
   vec4 c = mix(bg, front, front.a);
   return vec4(c.rgb, c.a * 0.8);
@@ -350,8 +350,8 @@ void main () {
     }
   }
 
-  // Compute where the camera/zoom is in the state texture
-  vec2 statePos = (p + disp + camera) / zoom;
+  // Compute where the CM/ZM is in the state texture
+  vec2 statePos = (p + disp + CM) / ZM;
   vec2 statePosFloor = floor(statePos);
   vec3 stateColor = stateColorPass(getState(statePosFloor), statePosFloor);
 
@@ -360,9 +360,9 @@ void main () {
   vec3 c = stateColor;
 
   vec3 noiseColor = vec3(0.02) * vec3(
-    rand(zoom*floor(p/zoom)+time/31.0),
-    rand(zoom*floor(p/zoom)+time/80.1),
-    rand(zoom*floor(p/zoom)+time/13.2)
+    rand(ZM*floor(p/ZM)+time/31.0),
+    rand(ZM*floor(p/ZM)+time/80.1),
+    rand(ZM*floor(p/ZM)+time/13.2)
   );
   vec3 pixelColor = -vec3(0.03) * (pixelPos.x - pixelPos.y);
 
@@ -447,11 +447,11 @@ void main () {
   }
 
   if (ST) {
-    if (GO || toRescue > 0.0) {
+    if (GO || TR > 0.0) {
       counterPos += vec2(0.0, 4.0 * counterMult);
       clr = animal(p, RES - vec2(2.0, 7.0) * counterMult, vec2(0.0), -1.0, 0.0, 0.0, 0.3 * counterMult);
       c = mix(c, clr.rgb + 0.2 - 0.3 * c, clr.a);
-      if (number2(toRescue, (counterPos/RES) * divider * vec2(1,RES.y/RES.x)) > 0.0) {
+      if (number2(TR, (counterPos/RES) * divider * vec2(1,RES.y/RES.x)) > 0.0) {
         c = vec3(0.0, 1.0, 0.0) + 0.5 * (1.0-c);
       }
     }
