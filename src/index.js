@@ -1196,12 +1196,12 @@ function render () {
       animal.v[0],
       animal.v[1],
       animal.d||0,
-      animal.d > 0 ? (Date.now() - animal.T)/1000 : 0,
+      animal.d > 0 ? (Date.now() - animal.T)/999 : 0,
       slope
     );
   }
 
-  var time = (Date.now()-startTime)/1000;
+  var time = (Date.now()-startTime)/999;
   gl.useProgram(renderProgram);
   gl.uniform2fv(resolutionL, resolution);
   gl.uniform2fv(renderWorldSizeL, worldSize);

@@ -93,7 +93,7 @@ bool hellTriggerPosition (vec2 p) {
   float dt = TI - TS - hellTickStart;
   float x = floor(dt / hellTickInterv);
   float y = (dt - x * hellTickInterv);
-  return distance(vec2(hellSize * 2.0 * x - ST, hellSize * y), p) <= hellSize;
+  return distance(vec2(2.0 * (hellSize * x - ST), hellSize * y), p) <= hellSize;
 }
 
 void main () {
