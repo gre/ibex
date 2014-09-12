@@ -5,8 +5,6 @@ IBEX
 The world is burning, Protect and Escort a group of wild ibex away from the inferno.
 On the path there are sleeping ibex to rescue, wake them and they will join the group.
 
-![](https://cloud.githubusercontent.com/assets/211411/4258739/b7a7b308-3ad8-11e4-92b6-bbacec535a1b.jpg)
-
 Gameplay
 ---
 
@@ -33,7 +31,7 @@ Keyboard: SPACE to draw an element, ARROWS to move, W/Z + X + C + V to switch be
 
 Keyboard is recommended but playing only with mouse is also possible (click on elements and DRAG the inner cursor).
 
----
+![](https://cloud.githubusercontent.com/assets/211411/4258739/b7a7b308-3ad8-11e4-92b6-bbacec535a1b.jpg)
 
 There is much much more to discover in the game, Enjoy!
 
