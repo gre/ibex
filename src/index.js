@@ -10,12 +10,12 @@ var jumps = [];
 var stepsSounds = [];
 var screams = [];
 for (i = 0; i < 4; ++i) {
-  screams.push(jsfxr([1,0.61,0.36,0.14,0.75,0.68,,-0.16,-0.02,0.73,0.12,-0.0999,0.32,Math.random()/2,0.32,0.22,0.1999,-0.02,0.4,-0.06,0.18,0.78,,0.5]));
-  jumps.push(jsfxr([0,0.03,0.3,0.13,0.2,0.26+i/20,,0.1399,,0.02,0.07,-0.06,,0.42,,,-0.06,-0.02,0.34,0.04,,0.28,0.06,0.3]));
-  stepsSounds.push(jsfxr([3,0.15+0.1*Math.random(),0.1749,,0.22,0.05+i/9,,-0.16,,,,,,,,,,,0.08,-0.06,,0.8,,0.5]));
+  screams.push(jsfxr([1,0.61,0.36,0.14,0.75,0.68,,-0.16,-0.02,0.73,0.12,-0.0999,0.32,Math.random()/2,0.32,0.22,0.1999,-0.02,0.4,-0.06,0.18,0.78,,0.3]));
+  jumps.push(jsfxr([0,0.03,0.3,0.13,0.2,0.26+i/20,,0.1399,,0.02,0.07,-0.06,,0.42,,,-0.06,-0.02,0.34,0.04,,0.28,0.06,0.2]));
+  stepsSounds.push(jsfxr([3,0.15+0.1*Math.random(),0.1749,,0.22,0.05+i/9,,-0.16,,,,,,,,,,,0.08,-0.06,,0.8,,0.6]));
 }
 
-var wakeUpSound = jsfxr([1,0.16,0.18,,0.45,0.23,,,0.1,0.37,0.2,0.58,0.44,,,,,,0.3,,0.21,0.15,0.34,0.5]);
+var wakeUpSound = jsfxr([1,0.16,0.18,,0.45,0.23,,,0.1,0.37,0.2,0.58,0.44,,,,,,0.3,,0.21,0.15,0.34,0.3]);
 
 var gameoverSound = jsfxr([0,0.11,1,0.22,0.7,0.61,,-0.06,-0.0799,0.21,0.28,-0.04,0.2,0.56,-0.4,,0.28,-0.54,0.1,-0.04,0.52,0.8,-0.02,0.8]);
 
@@ -799,7 +799,7 @@ gl.linkProgram(program);
 var logicSeedL = gl.getUniformLocation(program, "SD");
 var logicRunningL = gl.getUniformLocation(program, "RU");
 var logicTickL = gl.getUniformLocation(program, "TI");
-var logicWorldStartL = gl.getUniformLocation(program, "startX");
+var logicWorldStartL = gl.getUniformLocation(program, "ST");
 var logicStartTickL = gl.getUniformLocation(program, "TS");
 var logicStateL = gl.getUniformLocation(program, "state");
 var logicSizeL = gl.getUniformLocation(program, "SZ");
@@ -838,9 +838,12 @@ function affectColor (buf, i, c) {
   buf[i+3] = 1;
 }
 
+var generated = 0;
 function generate (startX) {
-  var randTerrainAmount = !worldStartX ? 0 : 0.08 * Math.random() * Math.random();
-  var randTerrainDown = !worldStartX ? 0 : 100 * Math.random() * Math.random();
+  var initial = !generated;
+  generated = 1;
+  var randTerrainAmount = initial ? 0 : 0.08 * Math.random() * Math.random();
+  var randTerrainDown = initial ? 0 : 100 * Math.random() * Math.random();
   var waterInGeneration = Math.random() < 0.3 ? 24 * Math.random() * Math.random() : 0;
   var volcanoInGeneration = Math.random() < - 0.1 * waterInGeneration + 0.4 ? 16 * Math.random() * Math.random() : 0;
 
@@ -920,10 +923,7 @@ function generate (startX) {
 
   // Locate good spots to spawn some animals to rescue
 
-  var nbSpots = startX ? Math.min(
-    -1 - Math.random() * 2 + 6 * Math.random() * Math.random(),
-    30-animals.length) : 5;
-  var spots = [];
+  var nbSpots, spots = [];
 
   // Dichotomic search starting from the center
   function locateSpot (xMin, xMax, maxIteration) {
@@ -952,13 +952,17 @@ function generate (startX) {
     }
   }
 
-  if (startX) {
+  if (initial) {
     nbSpots = 8;
     locateSpot(50, 128, 8);
     animalSpots = spots;
     spots = [];
     startX += 128;
   }
+
+  nbSpots = initial ? 5 : Math.min(
+    -1 - Math.random() * 4 + 6 * Math.random() * Math.random(),
+    30-animals.length);
 
   locateSpot(startX+1, worldSize[0]-1, 6);
   for (var i=0; i<spots.length; ++i) {
@@ -1129,7 +1133,7 @@ function render () {
     else if (self.d<0) {
       for (j=0; j<animals.length; j++) {
         var other = animals[j];
-        if (!other.d && distance(self.p, other.p) < 10) {
+        if (!other.d && distance(self.p, other.p) < 16) {
           self.d = 0;
           saved ++;
           play(wakeUpSound);
