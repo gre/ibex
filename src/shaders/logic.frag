@@ -87,8 +87,8 @@ float grassDistrib (vec2 p) {
 
 bool hellTriggerPosition (vec2 p) {
   if (tickStart==0.0) return false;
-  float hellTickStart = 600.0;
-  float hellTickInterv = 50.0;
+  float hellTickStart = 700.0;
+  float hellTickInterv = 60.0;
   float hellSize = 6.0;
   float dt = tick - tickStart - hellTickStart - hellSize * startX;
   float x = floor(dt / hellTickInterv);

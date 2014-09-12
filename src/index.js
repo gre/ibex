@@ -96,6 +96,7 @@ var zoom = 4;
 var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
 var cameraV = [0, 0 ];
 var mouse = [ 0, 0 ];
+var animalSpots = [];
 
 var dragStart;
 var dragCam;
@@ -716,6 +717,7 @@ onresize = function () {
   windowResolution = real;
   var h = Math.min(real[0], 512);
   var w = ~~(h * real[0] / real[1]);
+  if (!started) camera = [ 0, 256 * zoom - h / 2 ];
   resolution = [ w, h ];
   C.style.width = real[0]+"px";
   C.style.height = real[1]+"px";
@@ -873,7 +875,7 @@ function generate (startX) {
         e = ground(get(worldPixelBuf, startX-1, y)) ? 1 : 0;
       }
       else {
-        e = +(Math.random() > -0.25 * step(140, 0, x + worldStartX) * step(worldSize[1]-5, worldSize[1]-50, y) + 0.09 + randTerrainAmount + 0.3 * (step(0, 25, y) + step(worldSize[1]-50-randTerrainDown, worldSize[1] - 2 - 0.2 * randTerrainDown, y)));
+        e = +(Math.random() > -0.25 * (1 - step(0, 100, y / 2 + x + worldStartX)) + 0.09 + randTerrainAmount + 0.3 * (step(0, 25, y) + step(worldSize[1]-50-randTerrainDown, worldSize[1] - 2 - 0.2 * randTerrainDown, y)));
       }
       set(worldPixelBuf, x, y, e);
     }
@@ -948,6 +950,14 @@ function generate (startX) {
       locateSpot(xCenter, xMax, maxIteration-1);
       locateSpot(xMin, xCenter, maxIteration-1);
     }
+  }
+
+  if (startX) {
+    nbSpots = 8;
+    locateSpot(50, 128, 8);
+    animalSpots = spots;
+    spots = [];
+    startX += 128;
   }
 
   locateSpot(startX+1, worldSize[0]-1, 6);
@@ -1032,10 +1042,15 @@ for (x=0; x<100; ++x) {
 
 function init () {
   topScore = 0;
+  /*
   for (i = 0; i < 8; ++i) {
     var x = ~~(40 + 40 * Math.random());
     var y = tops[x]+1;
     var a = new Animal([ x, y ], ["n", 3000 + 3000 * Math.random(), 0]);
+    }*/
+  for (var i=0; i<animalSpots.length; ++i) {
+    var a = new Animal(animalSpots[i], ["n", 3000 + 3000 * Math.random(), 0]);
+    console.log(a);
     animals.push(a);
   }
 }
@@ -1052,10 +1067,10 @@ function start () {
   started = 1;
   init();
 
-  cameraV[1] = 4;
+  cameraV[1] = -4;
   var camT = Date.now();
   (function check () {
-    if (Date.now() - camT > 5000 || camera[1] + resolution[1] >= worldSize[1] * zoom) {
+    if (Date.now() - camT > 4000 || camera[1] < 0) {
       cameraV[1] = 0;
       startTick = tick;
     }
@@ -1163,7 +1178,8 @@ function render () {
     score = topScore;
   }
 
-  var camVel = drawing ? 0.5 * step(0, 200, Date.now()-lastCamKeysChange) : 1;//(currentCamKeys!="0_0" && Date.now()-lastCamKeysChange > 500 ? 2 : 1);
+  var camVel = drawing ? 0.5 : 1;//(currentCamKeys!="0_0" && Date.now()-lastCamKeysChange > 500 ? 2 : 1);
+  camVel *= step(0, 120, Date.now()-lastCamKeysChange);
   var dx = camVel * cameraV[0];
   var dy = camVel * cameraV[1];
   if (camStart) {
