@@ -79,7 +79,7 @@ var worldStartX = 0;
 
 var windowResolution;
 var resolution;
-var zoom = 8;
+var zoom = 4;
 var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
 var cameraV = [0, 0 ];
 var mouse = [ 0, 0 ];
@@ -696,7 +696,7 @@ gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
 onresize = function () {
   var real = [ window.innerWidth, window.innerHeight ];
   windowResolution = real;
-  var h = Math.min(real[0], 1024);
+  var h = Math.min(real[0], 512);
   var w = ~~(h * real[0] / real[1]);
   resolution = [ w, h ];
   C.style.width = real[0]+"px";
