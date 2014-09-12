@@ -12,7 +12,7 @@ var screams = [];
 for (i = 0; i < 4; ++i) {
   screams.push(jsfxr([1,0.61,0.36,0.14,0.75,0.68,,-0.16,-0.02,0.73,0.12,-0.0999,0.32,Math.random()/2,0.32,0.22,0.1999,-0.02,0.4,-0.06,0.18,0.78,,0.5]));
   jumps.push(jsfxr([0,0.03,0.3,0.13,0.2,0.26+i/20,,0.1399,,0.02,0.07,-0.06,,0.42,,,-0.06,-0.02,0.34,0.04,,0.28,0.06,0.3]));
-  stepsSounds.push(jsfxr([3,0.16,0.1749,,0.22,0.05+i/9,,-0.16,,,,,,,,,,,0.08,-0.06,,0.8,,0.3]));
+  stepsSounds.push(jsfxr([3,0.15+0.1*Math.random(),0.1749,,0.22,0.05+i/9,,-0.16,,,,,,,,,,,0.08,-0.06,,0.8,,0.5]));
 }
 
 var wakeUpSound = jsfxr([1,0.16,0.18,,0.45,0.23,,,0.1,0.37,0.2,0.58,0.44,,,,,,0.3,,0.21,0.15,0.34,0.5]);
@@ -22,6 +22,7 @@ var gameoverSound = jsfxr([0,0.11,1,0.22,0.7,0.61,,-0.06,-0.0799,0.21,0.28,-0.04
 ///////////// UTILITIES ////////////////////
 
 function play (src, volume) {
+  if (volume<=0) return;
   var player = new Audio();
   player.src = src;
   player.volume = volume||1;
@@ -29,7 +30,7 @@ function play (src, volume) {
 }
 
 function positionVolume (p) {
-  return Math.pow(step(100, 10, distance(p, posToWorld(cursorCenterPos()))), 2.0);
+  return Math.pow(step(80, 10, distance(p, posToWorld(cursorCenterPos()))), 2.0);
 }
 
 function shuffle (arr) {
@@ -654,7 +655,7 @@ function animalUpdate (animal, center) {
     v[1] *= friction;
   }
 
-  if(v[0] && Math.random() < 0.02) play(shuffle(stepsSounds), Math.random() * 0.3 + 0.7 * positionVolume(animal.p));
+  if(v[0] && Math.random() < 0.04) play(shuffle(stepsSounds), Math.random() * 0.3 + 0.7 * positionVolume(animal.p));
 
   // TODO implement 2D collision detection (avoid animal being stuck)
   var p = [ animal.p[0] + v[0], animal.p[1] + v[1] ];
@@ -1162,7 +1163,7 @@ function render () {
     score = topScore;
   }
 
-  var camVel = drawing ? 0.5 * step(0, 100, Date.now()-lastCamKeysChange) : 1;//(currentCamKeys!="0_0" && Date.now()-lastCamKeysChange > 500 ? 2 : 1);
+  var camVel = drawing ? 0.5 * step(0, 200, Date.now()-lastCamKeysChange) : 1;//(currentCamKeys!="0_0" && Date.now()-lastCamKeysChange > 500 ? 2 : 1);
   var dx = camVel * cameraV[0];
   var dy = camVel * cameraV[1];
   if (camStart) {
