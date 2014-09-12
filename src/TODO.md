@@ -11,20 +11,26 @@ TODO release
 - screenshot of the game + help in the image?
 - miniature image of the game (with the logo)
 
-- score += 1000 on rescue
-- have a game ending (at x=10000), safe place?
-  - try to reach the best score. Fact is you can be unbeatable if you play on top and just progress to the right...
-- polish the move to right behavior (too much move to left)
-- dead animal display differently on the map
-- more precise keyboard "pixel per pixel".
-- faster in forest
-- Water more powerful against volcano & fire. water does not enough remove fire.
-- water create too much forest?
-- water should propagate more with rain
-- more lighting? more lighter than darker.
-- too much volcano at 10'000
+DONE - score += 500 on rescue
+- play again at gameover screen
+DONE - display number of saved animals at gameover screen
+DONE - dead animal display differently on the map
+DONE - faster in forest
+DONE - Water more powerful against volcano & fire. water does not enough remove fire.
+DONE - water create too much forest
+DONE - water should propagate more with rain
+DONE - more lighting? more lighter than darker.
+DONE - more precise keyboard "pixel per pixel".
+
+not doing
+---
 - Start Bottom Left & Air destructible? + Sleeping ibex at the beginning
-- minor: try{}catch{} on localstorage access (some block the cookies extension break the game)
+- polish the move to right behavior (too much move to left)
+- too much volcano at 10'000
+- ??? have a game ending (at x=10000), safe place?
+  - try to reach the best score. Fact is you can be unbeatable if you play on top and just progress to the right...
+
+- try{}catch{} on localstorage access (some block the cookies extension break the game)
 - the audio seems to leak a lot of string allocation?
   - because of the data64 wav
   - player.src = src can be unefficient??

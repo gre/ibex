@@ -88,7 +88,7 @@ float grassDistrib (vec2 p) {
 bool hellTriggerPosition (vec2 p) {
   if (tickStart==0.0) return false;
   float hellTickStart = 600.0;
-  float hellTickInterv = 40.0;
+  float hellTickInterv = 50.0;
   float hellSize = 6.0;
   float dt = tick - tickStart - hellTickStart - hellSize * startX;
   float x = floor(dt / hellTickInterv);
@@ -122,8 +122,8 @@ void main () {
 
   // Fire grow / Fire + Water
   if (
-    -0.05 * float(NW==W) + -0.30 * float(NN==W) + -0.05 * float(NE==W) + // If water drop...
-    -0.50 * float(WW==W) + -0.30 * float(CC==W) + -0.50 * float(EE==W) + // ...or water nearby.
+    -0.05 * float(NW==W) + -0.40 * float(NN==W) + -0.05 * float(NE==W) + // If water drop...
+    -0.50 * float(WW==W) + -0.50 * float(CC==W) + -0.50 * float(EE==W) + // ...or water nearby.
      0.35 * float(SW==F) +  0.90 * float(SS==F) +  0.35 * float(SE==F)   // Fire will move up and expand a bit.
    >= 0.9 - 0.6 * RAND // The sum of matched weights must be enough important, also with some randomness
    
@@ -185,7 +185,7 @@ void main () {
     // Earth -> Source
     if (
       // water sometimes create sources
-      RAND < 0.01 && (
+      RAND < 0.3 && (
         1.0 * float(NW==W) + 1.2 * float(NN==W) + 1.0 * float(NE==W) +
         0.5 * float(WW==W) +                      0.5 * float(EE==W) +
         0.3 * float(SW==W) + 0.2 * float(SS==W) + 0.3 * float(SE==W)  
@@ -232,7 +232,7 @@ void main () {
       }
     }
     else if (!prevIsSolid && (AnyADJ(E) || AnyADJ(G) || AnyADJ(S))) {
-      if (RAND < 0.04 &&
+      if (RAND < 0.03 &&
         get(0, -grassMaxHeight) != G && (
           SS==G && RAND < 0.07 || // The grass sometimes grow
           SS==E && RAND < 0.02 || // The grass rarely spawn by itself
@@ -276,7 +276,7 @@ void main () {
       int(NW==S) + int(SE==S) + int(NE==S) + int(SW==S) + int(NN==S) + int(SS==S) + int(EE==S) + int(WW==S)
       > 1
     ) {
-      r = RAND < 0.3 ? V : (RAND < 0.6 ? S : E);
+      r = RAND < 0.2 ? V : (RAND < 0.8 ? S : E);
     }
   }
 
@@ -314,7 +314,7 @@ void main () {
 
     // Volcano <-> Source : A source can disappear near volcano
     if (AnyADJ(V)) {
-      r = RAND < 0.2 ? V : (RAND < 0.6 ? S : E);
+      r = RAND < 0.15 ? V : (RAND < 0.6 ? S : E);
     }
   }
 

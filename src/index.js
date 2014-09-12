@@ -7,17 +7,20 @@ var deaths = [
 ].map(jsfxr);
 
 var jumps = [];
-for (i = 0; i < 4; ++i)
-  jumps.push(jsfxr([0,0.03,0.3,0.13,0.2,0.26+i/20,,0.1399,,0.02,0.07,-0.06,,0.42,,,-0.06,-0.02,0.34,0.04,,0.28,0.06,0.2]));
-
 var stepsSounds = [];
-for (i = 0; i < 8; ++i)
-  stepsSounds.push(jsfxr([3,0.16,0.1749,,0.22,0.05+i/9,,-0.16,,,,,,,,,,,0.08,-0.06,,0.8,,0.6]));
+var screams = [];
+for (i = 0; i < 4; ++i) {
+  screams.push(jsfxr([1,0.61,0.36,0.14,0.75,0.68,,-0.16,-0.02,0.73,0.12,-0.0999,0.32,Math.random()/2,0.32,0.22,0.1999,-0.02,0.4,-0.06,0.18,0.78,,0.5]));
+  jumps.push(jsfxr([0,0.03,0.3,0.13,0.2,0.26+i/20,,0.1399,,0.02,0.07,-0.06,,0.42,,,-0.06,-0.02,0.34,0.04,,0.28,0.06,0.2]));
+  stepsSounds.push(jsfxr([3,0.16,0.1749,,0.22,0.05+i/9,,-0.16,,,,,,,,,,,0.08,-0.06,,0.8,,0.3]));
+}
 
 var wakeUpSound = jsfxr([1,0.16,0.18,,0.45,0.23,,,0.1,0.37,0.2,0.58,0.44,,,,,,0.3,,0.21,0.15,0.34,0.3]);
 
 var gameoverSound = jsfxr([0,0.11,1,0.22,0.7,0.61,,-0.06,-0.0799,0.21,0.28,-0.04,0.2,0.56,-0.4,,0.28,-0.54,0.1,-0.04,0.52,0.8,-0.02,0.5]);
 var initSound = jsfxr([0,0.11,1,0.22,0.7,0.19,,0.12,0.02,0.29,0.41,-0.26,0.56,0.56,-0.4,,0.28,-0.54,0.24,-0.04,,0.8,-0.02,0.5]);
+
+///////////// UTILITIES ////////////////////
 
 function play (src, volume) {
   var player = new Audio();
@@ -28,6 +31,23 @@ function play (src, volume) {
 
 function positionVolume (p) {
   return Math.pow(step(100, 10, distance(p, posToWorld(cursorCenterPos()))), 2.0);
+}
+
+function shuffle (arr) {
+  return arr[~~(Math.random() * arr.length)];
+}
+
+function distance (a, b) {
+  var dx = a[0] - b[0], dy = a[1] - b[1];
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+function parseColors (bufin, bufout) {
+  // bufin: RGBA colors, bufout: element indexes
+  // bufin size == 4 * bufout size
+  for (var i=0; i<bufin.length; i += 4) {
+    bufout[i/4] = ~~(0.5 + 9 * bufin[i] / 256);
+  }
 }
 
 ////// Game constants / states /////
@@ -41,6 +61,7 @@ var C = document.createElement("canvas");
 var started = 0;
 var gameover = 0;
 var topScore = +(localStorage.ibex || 0);
+var saved = 0;
 var score = topScore;
 var tiles = new Image();
 tiles.src = "t.png";
@@ -69,8 +90,8 @@ var colors = [
 var tick = 0;
 var startTick = 0;
 var worldRefreshTick = 0;
-var worldWindow = 90; // The size of the world chunk window in X
-var worldSize = [ 3 * worldWindow, 256 ];
+var worldWindow = 128; // The size of the world chunk window in X
+var worldSize = [ 2 * worldWindow, 256 ];
 var rescueSpawnMinY = 10;
 var rescueSpawnMaxY = 150;
 var worldPixelRawBuf = new Uint8Array(worldSize[0] * worldSize[1] * 4);
@@ -86,7 +107,7 @@ var mouse = [ 0, 0 ];
 
 var draw = 0;
 var drawPosition;
-var drawObject = 1;
+var drawObject = 0;
 var drawRadius = brushSize;
 
 var animals = [];
@@ -105,8 +126,8 @@ function posToWorld (p) {
 
 function setCam (c) {
   camera = [
-    clamp(-resolution[0]/2, resolution[0]/2+ zoom * worldSize[0] - resolution[0], c[0]),
-    clamp(-0.3 * resolution[1], 0.7 * resolution[1] + zoom * worldSize[1] - resolution[1], c[1])
+    clamp(-resolution[0]/2, resolution[0]/2 + zoom * worldSize[0] - resolution[0], c[0]),
+    clamp(- resolution[1] / 2, zoom * worldSize[1] - resolution[1] / 2, c[1])
   ];
 }
 
@@ -125,7 +146,7 @@ resetMouse();
 
 function uiSelectElement (p) {
   var height = 2 * 4 * zoom;
-  var originY = resolution[1] / 3 - 14 * zoom - height / 2;
+  var originY = resolution[1] / 2 - 14 * zoom - height / 2;
   if (originY-5 < p[1] && p[1] < originY + height + 5) {
     var width = 8 * zoom + 8;
     var x = (resolution[0] - 4 * width) / 2;
@@ -141,7 +162,7 @@ function isCursor (p) {
   return distance(cursorCenterPos(), p) < zoom * (brushSize + 2);
 }
 function cursorCenterPos () {
-  return [ resolution[0] / 2, resolution[1] / 3 ];
+  return [ resolution[0] / 2, resolution[1] / 2 ];
 }
 
 C.addEventListener("mouseleave", resetMouse);
@@ -279,13 +300,13 @@ function Animal (initialPosition, t) {
   // v: velocity
   self.v = [0, 0];
   // dt: next decision time
-  self.dt = 0;
+  // T: death time
+  self.T = self.dt = 0;
 
   // this.d <- the animal status.
   //      *  -1  animal to rescue.
   //      *   0  alive. 
   //      * > 0  died, with a reason code
-  // this.T <- death time
   // this.sl <- stats left
   // this.sr <- stats right
   // this.s <- size
@@ -383,6 +404,7 @@ function animalDie (animal, reason) {
   animal.d = 1+reason;
   animal.T = Date.now();
   play(deaths[reason], positionVolume(animal.p));
+  play(shuffle(screams));
 }
 
 function animalUpdate (animal, center) {
@@ -601,7 +623,6 @@ function animalUpdate (animal, center) {
         if (!dirS[0].a || a > 0 && b <= animal.p[0] || a < 0 && b >= animal.p[0]) {
           animal.v[0] = 0;
           c = 1;
-          play(stepsSounds[~~(Math.random() * stepsSounds.length)], Math.random() * 0.3 + 0.7 * positionVolume(animal.p));
         }
         else {
           animal.v[0] = a;
@@ -611,7 +632,7 @@ function animalUpdate (animal, center) {
         c = 1;
         animal.p[1] ++;
         animal.v = [a, b];
-        play(jumps[~~(Math.random() * jumps.length)], Math.random() * 0.3 + 0.7 * positionVolume(animal.p));
+        play(shuffle(jumps), Math.random() * 0.3 + 0.7 * positionVolume(animal.p));
       }
     }
     if (!c) i -= 3;
@@ -630,7 +651,7 @@ function animalUpdate (animal, center) {
     if (wind > 3) add[0] += 0.1;
     if (wind < 3) add[0] -= 0.1;
     if (groundDiff==0) {
-      friction *= 1 + 0.8 * step(0, 3, els[8]);
+      friction *= 1 + step(0, 3, els[8]);
       friction *= 1 - 0.2 * step(0, 3, els[3]);
     }
     v[0] += add[0];
@@ -638,6 +659,8 @@ function animalUpdate (animal, center) {
     v[0] *= friction;
     v[1] *= friction;
   }
+
+  if(v[0] && Math.random() < 0.02) play(shuffle(stepsSounds), Math.random() * 0.3 + 0.7 * positionVolume(animal.p));
 
   // TODO implement 2D collision detection (avoid animal being stuck)
   var p = [ animal.p[0] + v[0], animal.p[1] + v[1] ];
@@ -894,11 +917,15 @@ function generate (startX) {
 
   if (swp === cur) worldPixelBuf = swp;
 
+  for (i = 0; i < worldPixelBuf.length; ++i) {
+    affectColor(worldPixelRawBuf, 4 * i, worldPixelBuf[i]);
+  }
+
   // Locate good spots to spawn some animals to rescue
 
-  var nbSpots = Math.min(
+  var nbSpots = startX ? Math.min(
     -1 - Math.random() * 2 + 6 * Math.random() * Math.random(),
-    MAX_ANIMALS-animals.length);
+    MAX_ANIMALS-animals.length) : 5;
   var spots = [];
 
   // Dichotomic search starting from the center
@@ -907,7 +934,7 @@ function generate (startX) {
     var xCenter = ~~(xMin+(xMax-xMin)/2);
     var airOnTop = 0;
     for (
-      y = ~~(rescueSpawnMaxY - Math.random() * (rescueSpawnMaxY-rescueSpawnMinY)); // Not always spawn from the top
+      y = ~~(rescueSpawnMaxY - 0.5 * Math.random() * (rescueSpawnMaxY-rescueSpawnMinY)); // Not always spawn from the top
       y > rescueSpawnMinY;
       y--
     ) {
@@ -928,17 +955,11 @@ function generate (startX) {
     }
   }
 
-  if (startX) {
-    locateSpot(startX+1, worldSize[0]-1, 8);
-    for (var i=0; i<spots.length; ++i) {
-      var animal = new Animal(spots[i]);
-      animal.d = -1;
-      animals.push(animal);
-    }
-  }
-
-  for (i = 0; i < worldPixelBuf.length; ++i) {
-    affectColor(worldPixelRawBuf, 4 * i, worldPixelBuf[i]);
+  locateSpot(startX+1, worldSize[0]-1, 4);
+  for (var i=0; i<spots.length; ++i) {
+    var animal = new Animal(spots[i]);
+    animal.d = -1;
+    animals.push(animal);
   }
 
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, worldSize[0], worldSize[1], 0, gl.RGBA, gl.UNSIGNED_BYTE, worldPixelRawBuf);
@@ -1037,7 +1058,7 @@ function start () {
   started = 1;
   init();
 
-  cameraV[1] = 3;
+  cameraV[1] = 4;
   var camT = Date.now();
   (function check () {
     if (Date.now() - camT > 5000 || camera[1] + resolution[1] >= worldSize[1] * zoom) {
@@ -1108,6 +1129,7 @@ function render () {
         var other = animals[j];
         if (!other.d && distance(self.p, other.p) < 10) {
           self.d = 0;
+          saved ++;
           play(wakeUpSound);
           break;
         }
@@ -1122,7 +1144,7 @@ function render () {
     var animal = animals[i];
     animalUpdate(animal, centerAnimals);
     if (!animal.d) {
-      topScore = Math.max(topScore, ~~(animal.p[0]));
+      topScore = Math.max(topScore, ~~(animal.p[0]) + 500 * saved);
       alive ++;
     }
     else if (animal.d < 0) {
@@ -1147,7 +1169,7 @@ function render () {
     score = topScore;
   }
 
-  var camVel = drawing ? 0.5 : (currentCamKeys!="0_0" && Date.now()-lastCamKeysChange > 500 ? 2 : 1);
+  var camVel = drawing ? 0.5 * step(0, 100, Date.now()-lastCamKeysChange) : 1;//(currentCamKeys!="0_0" && Date.now()-lastCamKeysChange > 500 ? 2 : 1);
   var dx = camVel * cameraV[0];
   var dy = camVel * cameraV[1];
   if (camStart) {
@@ -1166,8 +1188,8 @@ function render () {
       animal.p[1],
       animal.v[0],
       animal.v[1],
-      animal.d,
-      (animal.T-startTime)/1000,
+      animal.d||0,
+      animal.d > 0 ? (Date.now() - animal.T)/1000 : 0,
       slope
     );
   }
@@ -1178,7 +1200,7 @@ function render () {
   gl.uniform2fv(renderWorldSizeL, worldSize);
   gl.uniform1f(renderTimeL, time);
   gl.uniform1f(renderAliveL, alive);
-  gl.uniform1f(renderToRescueL, toRescue);
+  gl.uniform1f(renderToRescueL, gameover ? saved : toRescue);
   gl.uniform1f(renderZoomL, zoom);
   gl.uniform2fv(cameraL, camera);
   gl.uniform2fv(mouseL, mouse);
@@ -1202,20 +1224,6 @@ document.body.appendChild(C);
 
 render();
 
-///////////// UTILITIES ////////////////////
-
-function distance (a, b) {
-  var dx = a[0] - b[0], dy = a[1] - b[1];
-  return Math.sqrt(dx*dx+dy*dy);
-}
-
-function parseColors (bufin, bufout) {
-  // bufin: RGBA colors, bufout: element indexes
-  // bufin size == 4 * bufout size
-  for (var i=0; i<bufin.length; i += 4) {
-    bufout[i/4] = ~~(0.5 + 9 * bufin[i] / 256);
-  }
-}
 
 // TODO: Remove in the final release
 
