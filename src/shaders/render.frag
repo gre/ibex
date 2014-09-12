@@ -24,11 +24,6 @@ uniform sampler2D tiles;
 uniform float drawRadius;
 uniform int drawObject;
 
-
-float constantAttenuation = 0.0;
-float linearAttenuation = 0.002;
-float quadraticAttenuation = 0.001;
-
 float rand(vec2 co){
   return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
 }
@@ -219,17 +214,18 @@ bool logo (vec2 p, vec2 pos, float size) {
   );
 }
 
+vec2 cursorCenter = resolution / vec2(2.0, 3.0);
+
 vec4 cursorUI (vec2 p, vec3 clr) {
-  vec2 center = resolution / vec2(2.0, 3.0);
   float radius = 6. * zoom;
-  float dist = distance(p, center);
+  float dist = distance(p, cursorCenter);
   vec3 c = colorFor(drawObject);
   vec3 c2 = 1.2 * (0.1 + c);
   if (dist < radius - 4.0) {
     return vec4(1.2 * mix(clr * c2, c, 0.6 - 0.3 * float(drawing)), 1.0);
   }
   else if (dist < radius) {
-    return vec4(c2 - 0.7 * clr, 1.0);
+    return vec4(c2 - 0.6 * clr, 1.0);
   }
   return vec4(0.0);
 }
@@ -238,17 +234,18 @@ vec4 elements (vec2 p, vec3 clr) {
   float radius = 4. * zoom;
   float margin = 8.;
   float s = 2.*radius+margin;
-  vec2 center = resolution / vec2(2.0, 3.0) - vec2(0.0, 14.0 * zoom);
+  vec2 center = cursorCenter - vec2(0.0, 14.0 * zoom);
   vec2 size = vec2(8.*radius + 3.*margin, 2.*radius);
   p = p - center + size / 2.0;
   if (p.x < 0.0 || p.x > size.x || p.y < 0.0 || p.y > size.y) return vec4(0.0);
   float i = floor(p.x / s);
+  float d = float(int(i) == drawObject);
   center = vec2(s * i, 0.0) + vec2(radius);
   float dist = distance(p, center);
-  vec3 c = 1.1 * colorFor(int(i)) + 0.2 - 0.2 * clr;
-  bool d = int(i) == drawObject;
-  if (dist < radius) {
-    return vec4(c, d ? 0.9 : 0.3);
+  vec3 c = colorFor(int(i));
+  c = 1.1 * (c + mix(0.0, 0.1, d)) + 0.4 * c;
+  if (dist < radius * mix(0.6, 1.0, d)) {
+    return vec4(c, 0.5);
   }
   return vec4(0.0);
 }
@@ -310,6 +307,10 @@ vec4 radar (vec2 p, vec2 from, vec2 to) {
   return vec4(c.rgb, c.a * 0.8);
 }
 
+float attenuation (float dist, float constantAttenuation, float linearAttenuation, float quadraticAttenuation) {
+  return 1.0 / (constantAttenuation + linearAttenuation * dist + quadraticAttenuation * dist * dist);
+}
+
 void main () {
   vec2 p = gl_FragCoord.xy;
   vec2 disp = vec2(0.0);
@@ -363,7 +364,11 @@ void main () {
   vec3 pixelColor = -vec3(0.03) * (pixelPos.x - pixelPos.y);
 
   vec4 animalsColor = vec4(0.0);
-  float animalsDistRev = 0.0;
+
+  float lightAttenuation = attenuation(distance(
+    cursorCenter,
+    p
+  ), 0.0, 0.001, 0.00001);
 
   for (int i=0; i<30; ++i) { if (i >= animalsLength) break;
     vec2 animalPos = vec2(
@@ -384,7 +389,10 @@ void main () {
       animalPos,
       statePos
     );
-    animalsDistRev += 1.0 / (constantAttenuation + linearAttenuation * dist + quadraticAttenuation * dist * dist);
+    lightAttenuation += attenuation(distance(
+      animalPos,
+      statePos
+    ), 0.0, 0.002, 0.001);
 
     animalsColor = mix(animalsColor, c, c.a);
   }
@@ -393,7 +401,7 @@ void main () {
   c = animalsColor.a==0.0 ? worldColor : mix(worldColor, animalsColor.rgb, min(1.0, animalsColor.a));
   c = mix(c, statePos.y < 0.0 ? colors[1] : colors[0], smoothstep(worldSize[0]-100.0, worldSize[0], statePos[0]));
 
-  c *= 0.7 + 0.3 * min(1.0, animalsDistRev);
+  c *= 0.7 + 0.3 * min(1.0, lightAttenuation);
 
   if (uiMatchAlpha > 0.0) {
     clr = cursorUI(p, c);
@@ -414,7 +422,7 @@ void main () {
     scorePos -= (resolution - resolution / vec2(6.0, 36.0)) / 2.;
   }
   if (number6(score, (scorePos/resolution) * 128. * vec2(1,resolution.y/resolution.x)) > 0.0) {
-    c = float(!started)*vec3(1.0, 0.2, 0.0) + 0.5 + 0.3 * (1.0-c);
+    c = mix(vec3(1.0, 0.5, 0.3), vec3(1.0, 0.3, 1.0), float(!started)) + 0.3 * (1.0-c);
   }
 
   if (!gameover && started) {

@@ -4,6 +4,13 @@ Game Goal
 - end of the world from left to right. rush to the right. infinite exploration.
 - Sleeping ibex in the map! go to wake & rescue them! (population increase, reason to go down)
 
+
+TODO release
+===
+
+- screenshot of the game + help in the image?
+- miniature image of the game (with the logo)
+
 TODO
 ===
 - Fix hell trigger position

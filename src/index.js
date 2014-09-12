@@ -33,7 +33,7 @@ function positionVolume (p) {
 ////// Game constants / states /////
 
 var MAX_ANIMALS = 30;
-var uiBrushSize = 6;
+var brushSize = 6;
 
 var seed = Math.random();
 var C = document.createElement("canvas");
@@ -79,7 +79,7 @@ var worldStartX = 0;
 
 var windowResolution;
 var resolution;
-var zoom;
+var zoom = 8;
 var camera = [ 0, 0 ]; // Camera is in resolution coordinate (not worldSize)
 var cameraV = [0, 0 ];
 var mouse = [ 0, 0 ];
@@ -87,15 +87,13 @@ var mouse = [ 0, 0 ];
 var draw = 0;
 var drawPosition;
 var drawObject = 1;
-var drawRadius = uiBrushSize;
+var drawRadius = brushSize;
 
 var animals = [];
 var alive;
 var toRescue;
 
 //////// Game events /////
-
-window.addEventListener("resize", onResize);
 
 function clamp (a, b, x) {
   return Math.max(a, Math.min(x, b));
@@ -113,12 +111,10 @@ function setCam (c) {
 }
 
 function posE (e) {
-  return [ e.clientX, windowResolution[1] - e.clientY ];
-}
-
-function distance (a, b) {
-  var dx = a[0] - b[0], dy = a[1] - b[1];
-  return Math.sqrt(dx*dx+dy*dy);
+  return [
+    e.clientX * resolution[0] / windowResolution[0],
+    resolution[1] - e.clientY * resolution[1] / windowResolution[1]
+  ];
 }
 
 function resetMouse () {
@@ -129,11 +125,11 @@ resetMouse();
 
 function uiSelectElement (p) {
   var height = 2 * 4 * zoom;
-  var originY = windowResolution[1] / 3 - 14 * zoom - height / 2;
-  if (originY < p[1] && p[1] < originY + height) {
+  var originY = resolution[1] / 3 - 14 * zoom - height / 2;
+  if (originY-5 < p[1] && p[1] < originY + height + 5) {
     var width = 8 * zoom + 8;
-    var x = (windowResolution[0] - 4 * width) / 2;
-    var i = Math.floor((p[0]-x)/width);
+    var x = (resolution[0] - 4 * width) / 2;
+    var i = ~~((p[0]-x)/width);
     if (0 <= i && i < 4) {
       return i;
     }
@@ -142,7 +138,7 @@ function uiSelectElement (p) {
 }
 
 function isCursor (p) {
-  return distance(cursorCenterPos(), p) < zoom * uiBrushSize;
+  return distance(cursorCenterPos(), p) < zoom * (brushSize + 2);
 }
 function cursorCenterPos () {
   return [ resolution[0] / 2, resolution[1] / 3 ];
@@ -297,9 +293,9 @@ function Animal (initialPosition, t) {
 }
 
 function animalPixel (animal, x, y) {
-  var sx = Math.floor(animal.p[0] - sighthalfw) + x - worldStartX;
+  var sx = ~~(animal.p[0] - sighthalfw) + x - worldStartX;
   if (sx < 0 || sx >= worldSize[0]) return 1;
-  var sy = Math.floor(animal.p[1] - sighthalfh) + y;
+  var sy = ~~(animal.p[1] - sighthalfh) + y;
   if (sy < 0 || sy >= worldSize[1]) return 1;
   return worldPixelBuf[sx + sy * worldSize[0]];
 }
@@ -308,7 +304,7 @@ function animalPixel (animal, x, y) {
 // I'm not doing prototype to save bytes (better limit the usage of fields which are hard to minimize)
 
 function animalSyncSight (animal) {
-  var h = worldRefreshTick+'_'+Math.floor(animal.p[0])+'_'+Math.floor(animal.p[1]);
+  var h = worldRefreshTick+'_'+~~(animal.p[0])+'_'+~~(animal.p[1]);
   if (animal.h == h) return;
   animal.h = h;
 
@@ -450,7 +446,7 @@ function animalUpdate (animal, center) {
   }
   else {
     animal.v[1] = 0;
-    animal.p[1] = Math.floor(animal.p[1]);
+    animal.p[1] = ~~(animal.p[1]);
   }
 
   // Edge case where the animal would fall forever
@@ -532,8 +528,8 @@ function animalUpdate (animal, center) {
       }
     }
 
-    x = Math.floor(animal.p[0]);
-    y = Math.floor(animal.p[1]);
+    x = ~~(animal.p[0]);
+    y = ~~(animal.p[1]);
 
     var decision = [];
 
@@ -605,7 +601,7 @@ function animalUpdate (animal, center) {
         if (!dirS[0].a || a > 0 && b <= animal.p[0] || a < 0 && b >= animal.p[0]) {
           animal.v[0] = 0;
           c = 1;
-          play(stepsSounds[Math.floor(Math.random() * stepsSounds.length)], Math.random() * 0.3 + 0.7 * positionVolume(animal.p));
+          play(stepsSounds[~~(Math.random() * stepsSounds.length)], Math.random() * 0.3 + 0.7 * positionVolume(animal.p));
         }
         else {
           animal.v[0] = a;
@@ -615,7 +611,7 @@ function animalUpdate (animal, center) {
         c = 1;
         animal.p[1] ++;
         animal.v = [a, b];
-        play(jumps[Math.floor(Math.random() * jumps.length)], Math.random() * 0.3 + 0.7 * positionVolume(animal.p));
+        play(jumps[~~(Math.random() * jumps.length)], Math.random() * 0.3 + 0.7 * positionVolume(animal.p));
       }
     }
     if (!c) i -= 3;
@@ -646,7 +642,7 @@ function animalUpdate (animal, center) {
   // TODO implement 2D collision detection (avoid animal being stuck)
   var p = [ animal.p[0] + v[0], animal.p[1] + v[1] ];
   if (groundDiff == 0) {
-    var dx = Math.floor(p[0]) - Math.floor(animal.p[0]);
+    var dx = ~~(p[0]) - ~~(animal.p[0]);
     if (dx) {
       var s = dx > 0 ? animal.sr : animal.sl;
       dx = Math.abs(dx);
@@ -696,7 +692,29 @@ gl.enableVertexAttribArray(renderPositionL);
 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 gl.vertexAttribPointer(renderPositionL, 2, gl.FLOAT, false, 0, 0);
 
-onResize();
+
+onresize = function () {
+  var real = [ window.innerWidth, window.innerHeight ];
+  windowResolution = real;
+  var h = Math.min(real[0], 1024);
+  var w = ~~(h * real[0] / real[1]);
+  resolution = [ w, h ];
+  C.style.width = real[0]+"px";
+  C.style.height = real[1]+"px";
+  C.width = resolution[0];
+  C.height = resolution[1];
+  gl.viewport(0, 0, C.width, C.height);
+  var x1 = 0, y1 = 0, x2 = resolution[0], y2 = resolution[1];
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        x1, y1,
+        x2, y1,
+        x1, y2,
+        x1, y2,
+        x2, y1,
+        x2, y2]), gl.STATIC_DRAW);
+  gl.uniform2fv(resolutionL, resolution);
+}
+onresize();
 
 var renderTimeL = gl.getUniformLocation(program, "time");
 var renderAliveL = gl.getUniformLocation(program, "alive");
@@ -735,29 +753,6 @@ tiles.onload = function () {
 
 gl.uniform1i(renderStateL, 0);
 gl.uniform3fv(renderColorsL, colors);
-
-function onResize () {
-  var real = [ window.innerWidth, window.innerHeight ];
-  windowResolution = real;
-  var h = Math.min(real[0], 768);
-  var w = Math.floor(h * real[0] / real[1]);
-  resolution = [ w, h ];
-  C.style.width = real[0]+"px";
-  C.style.height = real[1]+"px";
-  C.width = resolution[0];
-  C.height = resolution[1];
-  zoom = Math.round(2 + Math.sqrt(C.width * C.height) / 250);
-  gl.viewport(0, 0, C.width, C.height);
-  var x1 = 0, y1 = 0, x2 = resolution[0], y2 = resolution[1];
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        x1, y1,
-        x2, y1,
-        x1, y2,
-        x1, y2,
-        x2, y1,
-        x2, y2]), gl.STATIC_DRAW);
-  gl.uniform2fv(resolutionL, resolution);
-}
 
 var renderProgram = program;
 
@@ -819,7 +814,7 @@ function step (a, b, x) {
 }
 
 function affectColor (buf, i, c) {
-  buf[i] = Math.floor(256 * c / 9);
+  buf[i] = ~~(256 * c / 9);
   buf[i+3] = 1;
 }
 
@@ -909,10 +904,10 @@ function generate (startX) {
   // Dichotomic search starting from the center
   function locateSpot (xMin, xMax, maxIteration) {
     if (!maxIteration || nbSpots <= spots.length) return;
-    var xCenter = Math.floor(xMin+(xMax-xMin)/2);
+    var xCenter = ~~(xMin+(xMax-xMin)/2);
     var airOnTop = 0;
     for (
-      y = Math.floor(rescueSpawnMaxY - Math.random() * (rescueSpawnMaxY-rescueSpawnMinY)); // Not always spawn from the top
+      y = ~~(rescueSpawnMaxY - Math.random() * (rescueSpawnMaxY-rescueSpawnMinY)); // Not always spawn from the top
       y > rescueSpawnMinY;
       y--
     ) {
@@ -992,7 +987,7 @@ function checkRechunk () {
       maxX = Math.max(animal.p[0], maxX);
     }
   }
-  var windowInf = Math.max(worldStartX, worldWindow * Math.floor(minX / worldWindow - 2));
+  var windowInf = Math.max(worldStartX, worldWindow * ~~(minX / worldWindow - 2));
   var windowSup = Math.max(worldStartX + worldSize[0], worldWindow * Math.ceil(maxX / worldWindow + 2));
 
   var fromX = Math.max(0, windowInf - worldStartX); // No going back
@@ -1023,7 +1018,7 @@ function init () {
   play(initSound);
   topScore = 0;
   for (i = 0; i < initialAnimals; ++i) {
-    var x = Math.floor(40 + 40 * Math.random());
+    var x = ~~(40 + 40 * Math.random());
     var y = tops[x]+1;
     var a = new Animal([ x, y ], ["n", 3000 + 3000 * Math.random(), 0]);
     animals.push(a);
@@ -1127,7 +1122,7 @@ function render () {
     var animal = animals[i];
     animalUpdate(animal, centerAnimals);
     if (!animal.d) {
-      topScore = Math.max(topScore, Math.floor(animal.p[0]));
+      topScore = Math.max(topScore, ~~(animal.p[0]));
       alive ++;
     }
     else if (animal.d < 0) {
@@ -1209,11 +1204,16 @@ render();
 
 ///////////// UTILITIES ////////////////////
 
+function distance (a, b) {
+  var dx = a[0] - b[0], dy = a[1] - b[1];
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
 function parseColors (bufin, bufout) {
   // bufin: RGBA colors, bufout: element indexes
   // bufin size == 4 * bufout size
   for (var i=0; i<bufin.length; i += 4) {
-    bufout[i/4] = Math.floor(0.5 + 9 * bufin[i] / 256);
+    bufout[i/4] = ~~(0.5 + 9 * bufin[i] / 256);
   }
 }
 
