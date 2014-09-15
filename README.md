@@ -1,3 +1,4 @@
+**Having issue running the game?** [http://greweb.me/js13k-2014](http://greweb.me/js13k-2014) <- this post-version should fix it but still need WebGL support.
 
 IBEX
 ===
