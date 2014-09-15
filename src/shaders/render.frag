@@ -1,7 +1,5 @@
 precision highp float;
 
-uniform vec3 CL[9];
-
 uniform vec2 WS;
 uniform vec2 RES;
 
@@ -14,13 +12,43 @@ uniform float score;
 
 uniform float time;
 uniform sampler2D state;
-uniform float AN[7 * 30]; // array of [x, y, vx, vy, deathReason, deathTime, slope]
+uniform float AN[4 * 30];
 uniform int AL;
 uniform float alive;
 uniform float TR;
 uniform sampler2D tiles;
 
 uniform int DO;
+
+vec3 colorAir     = vec3(0.11, 0.16, 0.23);
+vec3 colorEarth   = vec3(0.74, 0.66, 0.51);
+vec3 colorFire    = vec3(0.84, 0.17, 0.08);
+vec3 colorWater   = vec3(0.40, 0.75, 0.90);
+vec3 colorVolcano = vec3(0.60, 0.00, 0.00);
+vec3 colorSource  = vec3(0.30, 0.60, 0.70);
+vec3 colorWindL   = vec3(0.15, 0.20, 0.27);
+vec3 colorWindR   = vec3(0.07, 0.12, 0.19);
+vec3 colorGrass   = vec3(0.20, 0.60, 0.20);
+
+vec3 colorFor (int e) {
+  if(e==0) return colorAir    ;
+  if(e==1) return colorEarth  ;
+  if(e==2) return colorFire   ;
+  if(e==3) return colorWater  ;
+  if(e==4) return colorVolcano;
+  if(e==5) return colorSource ;
+  if(e==6) return colorWindL  ;
+  if(e==7) return colorWindR  ;
+           return colorGrass  ;
+}
+
+vec3 unpackV3 (float f) {
+  float cz = fract(f);
+  float ry = (f-cz)/256.0;
+  float cy = fract(ry);
+  float cx = fract((ry-cy)/256.0);
+  return vec3(cx, cy, cz) * 2.0 - 1.0;
+}
 
 float rand(vec2 co){
   return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
@@ -94,7 +122,6 @@ float number2 (float n, vec2 p) {
   return c;
 }
 
-
 vec4 animal (vec2 p, vec2 pos, vec2 v, float d, float T, float s, float size) {
   // Died displacement
   vec2 disp = d>0.0 ?
@@ -154,18 +181,6 @@ vec2 dispPass (float intensity, float amp, float speed) {
     cos(speed*1.1*time+amp*0.9*gl_FragCoord.x+0.5),
     sin(speed*time+amp*gl_FragCoord.y+0.1)
   );
-}
-
-vec3 colorFor (int e) {
-  if(e==0) return CL[0];
-  if(e==1) return CL[1];
-  if(e==2) return CL[2];
-  if(e==3) return CL[3];
-  if(e==4) return CL[4];
-  if(e==5) return CL[5];
-  if(e==6) return CL[6];
-  if(e==7) return CL[7];
-  return CL[8];
 }
 
 int getState (vec2 pos) {
@@ -286,8 +301,8 @@ vec4 radar (vec2 p, vec2 from, vec2 to) {
   float animalToBeRescue = 0.0;
   float animalDead = 0.0;
   for (int i=0; i<30; ++i) { if (i >= AL) break;
-    float dist = distance(vec2(AN[7*i+0], AN[7*i+1]), statePos);
-    float status = AN[7*i+4];
+    float dist = distance(vec2(AN[4*i+0], AN[4*i+1]), statePos);
+    float status = unpackV3(AN[4*i+3]).x * 9.;
     if (status < 0.0)
       animalToBeRescue += float(dist <= 6.0);
     else if (status == 0.0)
@@ -297,7 +312,7 @@ vec4 radar (vec2 p, vec2 from, vec2 to) {
   }
 
   vec4 bg =
-    vec4(mix(CL[0], 1.2 * (0.1 + pixel.rgb), 0.7), 1.0);
+    vec4(mix(colorAir, 1.2 * (0.1 + pixel.rgb), 0.7), 1.0);
 
   vec4 front =
     float(animalToBeRescue > 0.0) * vec4(0.2, 1.0, 0.2, 1.0)
@@ -375,8 +390,23 @@ void main () {
 
   for (int i=0; i<30; ++i) { if (i >= AL) break;
     vec2 animalPos = vec2(
-        AN[7*i+0],
-        AN[7*i+1]);
+        AN[4*i+0],
+        AN[4*i+1]);
+    vec3 p1 = unpackV3(AN[4*i+2]);
+    vec3 p2 = unpackV3(AN[4*i+3]);
+    vec2 vel = p1.xy * 9.;
+    float d = p2.x * 9.;
+    float T = p2.y * 9.;
+    float slope = p2.z * 9.;
+    vec4 c = animal(
+        statePos,
+        animalPos,
+        vel,
+        d,
+        T,
+        slope,
+        1.0);
+    /*
     float T = AN[7*i+5];
     float d = AN[7*i+4];
     vec4 c = animal(
@@ -389,6 +419,7 @@ void main () {
         T,
         AN[7*i+6],
         1.0);
+        */
 
     float dist = distance(
       animalPos,
@@ -405,7 +436,7 @@ void main () {
   vec3 worldColor = c + noiseColor + pixelColor;
   c = animalsColor.a==0.0 ? worldColor : mix(worldColor, animalsColor.rgb, min(1.0, animalsColor.a));
 
-  c = mix(CL[0], c, min(1.0, lightAttenuation)
+  c = mix(colorAir, c, min(1.0, lightAttenuation)
     * smoothstep(WS.x, WS.x-100.0, statePos.x)
     * smoothstep(0.0, 50.0, statePos.x));
 

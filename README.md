@@ -31,10 +31,11 @@ Keyboard: SPACE to draw an element, ARROWS to move, W/Z + X + C + V to switch be
 
 Keyboard is recommended but playing only with mouse is also possible (click on elements and DRAG the inner cursor).
 
----
+![](https://cloud.githubusercontent.com/assets/211411/4258739/b7a7b308-3ad8-11e4-92b6-bbacec535a1b.jpg)
 
 There is much much more to discover in the game, Enjoy!
 
+![](https://cloud.githubusercontent.com/assets/211411/4258694/1361f402-3ad8-11e4-8855-ab081e5ff642.png)
 
 ---
 
