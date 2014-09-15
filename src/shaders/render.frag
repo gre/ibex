@@ -1,7 +1,5 @@
 precision highp float;
 
-uniform vec3 CL[9];
-
 uniform vec2 WS;
 uniform vec2 RES;
 
@@ -21,6 +19,28 @@ uniform float TR;
 uniform sampler2D tiles;
 
 uniform int DO;
+
+vec3 colorAir     = vec3(0.11, 0.16, 0.23);
+vec3 colorEarth   = vec3(0.74, 0.66, 0.51);
+vec3 colorFire    = vec3(0.84, 0.17, 0.08);
+vec3 colorWater   = vec3(0.40, 0.75, 0.90);
+vec3 colorVolcano = vec3(0.60, 0.00, 0.00);
+vec3 colorSource  = vec3(0.30, 0.60, 0.70);
+vec3 colorWindL   = vec3(0.15, 0.20, 0.27);
+vec3 colorWindR   = vec3(0.07, 0.12, 0.19);
+vec3 colorGrass   = vec3(0.20, 0.60, 0.20);
+
+vec3 colorFor (int e) {
+  if(e==0) return colorAir    ;
+  if(e==1) return colorEarth  ;
+  if(e==2) return colorFire   ;
+  if(e==3) return colorWater  ;
+  if(e==4) return colorVolcano;
+  if(e==5) return colorSource ;
+  if(e==6) return colorWindL  ;
+  if(e==7) return colorWindR  ;
+           return colorGrass  ;
+}
 
 float rand(vec2 co){
   return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
@@ -156,18 +176,6 @@ vec2 dispPass (float intensity, float amp, float speed) {
   );
 }
 
-vec3 colorFor (int e) {
-  if(e==0) return CL[0];
-  if(e==1) return CL[1];
-  if(e==2) return CL[2];
-  if(e==3) return CL[3];
-  if(e==4) return CL[4];
-  if(e==5) return CL[5];
-  if(e==6) return CL[6];
-  if(e==7) return CL[7];
-  return CL[8];
-}
-
 int getState (vec2 pos) {
   vec2 uv = (floor(pos) + 0.5) / WS;
   bool outOfBound = uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0;
@@ -297,7 +305,7 @@ vec4 radar (vec2 p, vec2 from, vec2 to) {
   }
 
   vec4 bg =
-    vec4(mix(CL[0], 1.2 * (0.1 + pixel.rgb), 0.7), 1.0);
+    vec4(mix(colorAir, 1.2 * (0.1 + pixel.rgb), 0.7), 1.0);
 
   vec4 front =
     float(animalToBeRescue > 0.0) * vec4(0.2, 1.0, 0.2, 1.0)
@@ -405,7 +413,7 @@ void main () {
   vec3 worldColor = c + noiseColor + pixelColor;
   c = animalsColor.a==0.0 ? worldColor : mix(worldColor, animalsColor.rgb, min(1.0, animalsColor.a));
 
-  c = mix(CL[0], c, min(1.0, lightAttenuation)
+  c = mix(colorAir, c, min(1.0, lightAttenuation)
     * smoothstep(WS.x, WS.x-100.0, statePos.x)
     * smoothstep(0.0, 50.0, statePos.x));
 

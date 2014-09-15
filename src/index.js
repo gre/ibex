@@ -64,21 +64,6 @@ tiles.src = "t.png";
 
 // in milliseconds
 
-var colors = [
-  0.11, 0.16, 0.23, // 0: air
-  0.74, 0.66, 0.51, // 1: earth
-  0.84, 0.17, 0.08, // 2: fire
-  0.40, 0.75, 0.90, // 3: water
-
-  // spawners
-  0.60, 0.00, 0.00, // 4: volcano (fire spawner)
-  0.30, 0.60, 0.70, // 5: source (water spawner)
-
-  0.15, 0.20, 0.27,  // 6: wind left
-  0.07, 0.12, 0.19,  // 7: wind right
-  0.20, 0.60, 0.20   // 8: grass (forest)
-];
-
 var tick = 0;
 var startTick = 0;
 var worldRefreshTick = 0;
@@ -748,7 +733,6 @@ var renderWorldSizeL = gl.getUniformLocation(program, "WS");
 var renderAnimalsL = gl.getUniformLocation(program, "AN");
 var renderAnimalsLengthL = gl.getUniformLocation(program, "AL");
 var renderAnimalsTilesL = gl.getUniformLocation(program, "tiles");
-var renderColorsL = gl.getUniformLocation(program, "CL");
 var renderDrawObjectL = gl.getUniformLocation(program, "DO");
 //var renderDrawRadiusL = gl.getUniformLocation(program, "drawRadius");
 
@@ -772,7 +756,6 @@ tiles.onload = function () {
 }
 
 gl.uniform1i(renderStateL, 0);
-gl.uniform3fv(renderColorsL, colors);
 
 var renderProgram = program;
 
