@@ -146,6 +146,10 @@ function cursorCenterPos () {
   return [ resolution[0] / 2, resolution[1] / 2 ];
 }
 
+function packV3 (a, b, c) {
+  return 256 * ~~(256 * step(-1, 1, a)) + ~~(256 * step(-1, 1, b)) + ~~(256 * step(-1, 1, c))/256;
+}
+
 C.addEventListener("mouseleave", resetMouse);
 
 C.addEventListener("mousedown", function (e) {
@@ -676,18 +680,18 @@ shaderSrc = VERTEX_RENDER; shaderType = gl.VERTEX_SHADER;
 shader = gl.createShader(shaderType);
 gl.shaderSource(shader, shaderSrc);
 gl.compileShader(shader);
-//validate(shader, shaderSrc);
+validate(shader, shaderSrc);
 gl.attachShader(program, shader);
 
 shaderSrc = FRAGMENT_RENDER; shaderType = gl.FRAGMENT_SHADER;
 shader = gl.createShader(shaderType);
 gl.shaderSource(shader, shaderSrc);
 gl.compileShader(shader);
-//validate(shader, shaderSrc);
+validate(shader, shaderSrc);
 gl.attachShader(program, shader);
 
 gl.linkProgram(program);
-//validateProg(program);
+validateProg(program);
 gl.useProgram(program);
 
 var buffer = gl.createBuffer();
@@ -766,18 +770,18 @@ shaderSrc = VERTEX_LOGIC; shaderType = gl.VERTEX_SHADER;
 shader = gl.createShader(shaderType);
 gl.shaderSource(shader, shaderSrc);
 gl.compileShader(shader);
-//validate(shader, shaderSrc);
+validate(shader, shaderSrc);
 gl.attachShader(program, shader);
 
 shaderSrc = FRAGMENT_LOGIC; shaderType = gl.FRAGMENT_SHADER;
 shader = gl.createShader(shaderType);
 gl.shaderSource(shader, shaderSrc);
 gl.compileShader(shader);
-//validate(shader, shaderSrc);
+validate(shader, shaderSrc);
 gl.attachShader(program, shader);
 
 gl.linkProgram(program);
-//validateProg(program);
+validateProg(program);
 
 var logicSeedL = gl.getUniformLocation(program, "SD");
 var logicRunningL = gl.getUniformLocation(program, "RU");
@@ -1173,14 +1177,18 @@ function render () {
     var animal = animals[i];
     var statBack = animal.v[0] > 0 ? animal.sl : animal.sr;
     var slope = statBack[0].f+1==sighthalfh && statBack[3].a ? statBack[0].f - statBack[3].f : 0;
+    var p1 = packV3(
+      animal.v[0] / 9,
+      animal.v[1] / 9, 0);
+    var p2 = packV3(
+      (animal.d||0) / 9,
+      animal.d > 0 ? (Date.now() - animal.T)/9000 : 0,
+      slope / 9);
     animalsData.push(
       animal.p[0] - worldStartX,
       animal.p[1],
-      animal.v[0],
-      animal.v[1],
-      animal.d||0,
-      animal.d > 0 ? (Date.now() - animal.T)/999 : 0,
-      slope
+      p1,
+      p2
     );
   }
 
@@ -1215,7 +1223,6 @@ document.body.appendChild(C);
 render();
 
 
-/*
 // TODO: Remove in the final release
 
 function validate (shader, shaderSource) {
@@ -1243,4 +1250,3 @@ function validateProg (program) {
    }
 }
 
-*/

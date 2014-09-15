@@ -12,7 +12,7 @@ uniform float score;
 
 uniform float time;
 uniform sampler2D state;
-uniform float AN[7 * 30]; // array of [x, y, vx, vy, deathReason, deathTime, slope]
+uniform float AN[4 * 30];
 uniform int AL;
 uniform float alive;
 uniform float TR;
@@ -40,6 +40,14 @@ vec3 colorFor (int e) {
   if(e==6) return colorWindL  ;
   if(e==7) return colorWindR  ;
            return colorGrass  ;
+}
+
+vec3 unpackV3 (float f) {
+  float cz = fract(f);
+  float ry = (f-cz)/256.0;
+  float cy = fract(ry);
+  float cx = fract((ry-cy)/256.0);
+  return vec3(cx, cy, cz) * 2.0 - 1.0;
 }
 
 float rand(vec2 co){
@@ -113,7 +121,6 @@ float number2 (float n, vec2 p) {
   c += digit(n,floor(p-cpos));
   return c;
 }
-
 
 vec4 animal (vec2 p, vec2 pos, vec2 v, float d, float T, float s, float size) {
   // Died displacement
@@ -294,8 +301,8 @@ vec4 radar (vec2 p, vec2 from, vec2 to) {
   float animalToBeRescue = 0.0;
   float animalDead = 0.0;
   for (int i=0; i<30; ++i) { if (i >= AL) break;
-    float dist = distance(vec2(AN[7*i+0], AN[7*i+1]), statePos);
-    float status = AN[7*i+4];
+    float dist = distance(vec2(AN[4*i+0], AN[4*i+1]), statePos);
+    float status = unpackV3(AN[4*i+3]).x * 9.;
     if (status < 0.0)
       animalToBeRescue += float(dist <= 6.0);
     else if (status == 0.0)
@@ -383,8 +390,23 @@ void main () {
 
   for (int i=0; i<30; ++i) { if (i >= AL) break;
     vec2 animalPos = vec2(
-        AN[7*i+0],
-        AN[7*i+1]);
+        AN[4*i+0],
+        AN[4*i+1]);
+    vec3 p1 = unpackV3(AN[4*i+2]);
+    vec3 p2 = unpackV3(AN[4*i+3]);
+    vec2 vel = p1.xy * 9.;
+    float d = p2.x * 9.;
+    float T = p2.y * 9.;
+    float slope = p2.z * 9.;
+    vec4 c = animal(
+        statePos,
+        animalPos,
+        vel,
+        d,
+        T,
+        slope,
+        1.0);
+    /*
     float T = AN[7*i+5];
     float d = AN[7*i+4];
     vec4 c = animal(
@@ -397,6 +419,7 @@ void main () {
         T,
         AN[7*i+6],
         1.0);
+        */
 
     float dist = distance(
       animalPos,
