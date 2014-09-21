@@ -1,3 +1,10 @@
+var props = { firePropagation: 0.8 };
+
+var gui = new dat.GUI();
+gui.add(props, 'firePropagation', 0, 1);
+
+////
+
 var x, y, i, j;
 
 var deaths = [
@@ -795,6 +802,7 @@ var logicDrawPositionL = gl.getUniformLocation(program, "DP");
 var logicDrawObjectL = gl.getUniformLocation(program, "DO");
 var logicDrawRadiusL = gl.getUniformLocation(program, "DR");
 var logicPositionL = gl.getAttribLocation(program, "P");
+var logicFirePropagationL = gl.getUniformLocation(program, "firePropagation");
 
 gl.enableVertexAttribArray(logicPositionL);
 
@@ -831,8 +839,12 @@ function generate (startX) {
   generated = 1;
   var randTerrainAmount = initial ? 0 : 0.08 * Math.random() * Math.random();
   var randTerrainDown = initial ? 0 : 100 * Math.random() * Math.random();
+  /*
   var waterInGeneration = Math.random() < 0.3 ? 24 * Math.random() * Math.random() : 0;
   var volcanoInGeneration = Math.random() < - 0.1 * waterInGeneration + 0.4 ? 16 * Math.random() * Math.random() : 0;
+  */
+  var waterInGeneration = 0;
+  var volcanoInGeneration = 0;
 
   // This could be implemented in a 3rd shader for performance.
 
@@ -893,6 +905,7 @@ function generate (startX) {
         var e = +(sum <= 6 + (Math.random()-0.5) * (1-k/K));
         if (e && sum >= 6 - Math.random() * waterInGeneration + 4 * step(110, 0, y)) e = 5;
         if (e && sum >= 6 - Math.random() * volcanoInGeneration + 6 * step(20, 60, y)) e = 4;
+        if (k==K-1 && e == 0) e = 8;
         set(swp, x, y, e);
       }
     }
@@ -938,7 +951,7 @@ function generate (startX) {
       locateSpot(xMin, xCenter, maxIteration);
     }
   }
-
+  /*
   if (initial) {
     nbSpots = 8;
     locateSpot(50, 128, 8);
@@ -957,6 +970,7 @@ function generate (startX) {
     animal.d = -1;
     animals.push(animal);
   }
+  */
 
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, worldSize[0], worldSize[1], 0, gl.RGBA, gl.UNSIGNED_BYTE, worldPixelRawBuf);
 }
@@ -1033,10 +1047,12 @@ for (x=0; x<100; ++x) {
 
 function init () {
   topScore = 0;
+  /*
   for (var i=0; i<animalSpots.length; ++i) {
     var a = new Animal(animalSpots[i], ["n", 3000 + 3000 * Math.random(), 0]);
     animals.push(a);
   }
+  */
 }
 
 function gameOver () {
@@ -1077,6 +1093,7 @@ function update () {
   gl.uniform1f(logicStartTickL, startTick);
   gl.uniform1i(logicRunningL, started);
   gl.uniform1i(logicDrawL, draw);
+  gl.uniform1f(logicFirePropagationL, props.firePropagation);
   if (draw) {
     draw = 0;
     gl.uniform2iv(logicDrawPositionL, drawPosition);
@@ -1153,6 +1170,7 @@ function render () {
 
   score = score + 0.01*(topScore-score);
 
+  /*
   if (started && !alive) {
     if (!gameover) {
       gameOver();
@@ -1161,6 +1179,7 @@ function render () {
     gameover = 1;
     score = topScore;
   }
+  */
 
   var camVel = drawing ? 0.5 : 1;//(currentCamKeys!="0_0" && Date.now()-lastCamKeysChange > 500 ? 2 : 1);
   camVel *= step(0, 120, Date.now()-lastCamKeysChange);
@@ -1217,7 +1236,7 @@ function render () {
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 };
 
-document.body.innerHTML = '';
+//document.body.innerHTML = '';
 document.body.appendChild(C);
 
 render();

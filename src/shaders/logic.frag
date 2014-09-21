@@ -63,6 +63,8 @@ uniform ivec2 DP;
 uniform float DR;
 uniform int DO;
 
+uniform float firePropagation;
+
 int get (int x_, int y_) {
   vec2 uv = (gl_FragCoord.xy + vec2(x_, y_)) / SZ;
   return (uv.x < 0.0 || uv.x >= 1.0 || uv.y < 0.0 || uv.y >= 1.0) ? 0 : 
@@ -129,7 +131,7 @@ void main () {
    
    ||  // Fire propagation: When fire met grass, fire can stay to continue to consume it
 
-   CC == F && RAND < 0.9 && AnyADJ(G)
+   CC == F && RAND < firePropagation && AnyADJ(G)
   ) {
     r = F;
   }
@@ -219,12 +221,12 @@ void main () {
   }
   
   ////// Grass RULES ////
-  if (grassMaxHeight > 0) {
+  //if (grassMaxHeight > 0) {
     if (CC == G) {
       r = G;
       if (
       CC == G &&
-      RAND < 0.9 && (
+      RAND < firePropagation && (
         AnyADJ(F) ||
         AnyADJ(V)
       )) {
@@ -243,7 +245,7 @@ void main () {
         r = G;
       }
     }
-  }
+  //}
 
 
   ////// VOLCANO RULES /////

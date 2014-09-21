@@ -9,7 +9,7 @@
     "tmpljs": " cat src/pre.js src/jsfxr.js >> build/build.js; ./wrap.sh build/render.frag FRAGMENT_RENDER >> build/build.js && ./wrap.sh build/render.vert VERTEX_RENDER >> build/build.js && ./wrap.sh build/logic.frag FRAGMENT_LOGIC >> build/build.js && ./wrap.sh build/logic.vert VERTEX_LOGIC >> build/build.js; cat src/index.js >> build/build.js; cat src/post.js >> build/build.js",
     "minify": "uglifyjs build/build.js -c --screw-ie8 -m -o build/build.min.js",
     "nominify": "cp build/build.js build/build.min.js",
-    "gen": "cp assets/tiles.png target/t.png && cp src/target.html target/index.html && cp build/build.min.js target/b.js",
+    "gen": "cp assets/tiles.png target/t.png && cp dat.gui.min.js target/ && cp src/target.html target/index.html && cp build/build.min.js target/b.js",
     "build": "npm run cleanall && npm run compileglsl && npm run tmpljs && npm run minify && npm run gen",
     "build-nominify": "npm run cleanall && npm run compileglsl && npm run tmpljs && npm run nominify && npm run gen",
     "watch": "npm run build; wr 'npm run build' src/ assets/"

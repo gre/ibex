@@ -406,21 +406,6 @@ void main () {
         T,
         slope,
         1.0);
-    /*
-    float T = AN[7*i+5];
-    float d = AN[7*i+4];
-    vec4 c = animal(
-        statePos,
-        animalPos,
-        vec2(
-        AN[7*i+2],
-        AN[7*i+3]),
-        d,
-        T,
-        AN[7*i+6],
-        1.0);
-        */
-
     float dist = distance(
       animalPos,
       statePos
