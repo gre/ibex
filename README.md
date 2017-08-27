@@ -5,7 +5,7 @@ Articles
 - [Postmortem: How Cellular Automata is done in GLSL](http://greweb.me/2014/09/ibex-cellular-automata/)
 
 
-**Having issue running the game?** [http://greweb.me/js13k-2014](http://greweb.me/js13k-2014) <- this post-version should fix it but still need WebGL support.
+**Having issue running the game?** [greweb.itch.io/ibex](https://greweb.itch.io/ibex) <- this post-version should fix it but still need WebGL support.
 
 IBEX
 ===
