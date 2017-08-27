@@ -488,36 +488,44 @@ function handleKeys() {
   cameraV = [s * dx, s * dy];
 }
 
-document.addEventListener("keyup", function(e) {
-  var w = e.which;
-  keysDown[w] = 0;
-  if (
-    (37 <= w && w <= 40) ||
-    w == 87 ||
-    w == 90 ||
-    w == 88 ||
-    w == 67 ||
-    w == 86
-  ) {
-    handleKeys();
-  }
-});
+document.body.addEventListener(
+  "keyup",
+  function(e) {
+    var w = e.which;
+    keysDown[w] = 0;
+    if (
+      (37 <= w && w <= 40) ||
+      w == 87 ||
+      w == 90 ||
+      w == 88 ||
+      w == 67 ||
+      w == 86
+    ) {
+      handleKeys();
+    }
+  },
+  false
+);
 
-document.addEventListener("keydown", function(e) {
-  var w = e.which;
-  keysDown[w] = 1;
-  if (
-    (37 <= w && w <= 40) ||
-    w == 87 ||
-    w == 90 ||
-    w == 88 ||
-    w == 67 ||
-    w == 86
-  ) {
-    e.preventDefault();
-    handleKeys();
-  }
-});
+document.body.addEventListener(
+  "keydown",
+  function(e) {
+    var w = e.which;
+    keysDown[w] = 1;
+    if (
+      (37 <= w && w <= 40) ||
+      w == 87 ||
+      w == 90 ||
+      w == 88 ||
+      w == 67 ||
+      w == 86
+    ) {
+      e.preventDefault();
+      handleKeys();
+    }
+  },
+  false
+);
 
 ///////// UTILS /////////////////////
 
